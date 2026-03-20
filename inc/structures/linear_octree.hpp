@@ -605,6 +605,7 @@ protected:
                 precomputedRadii[maxDepthSeen].getZ()
             ));
         }
+        /*
         for (size_t leaf = 0; leaf < nLeaf; leaf++) {
             if(leaf<500){
                 auto [begin, end] = getLeafRange(leaf);
@@ -617,7 +618,7 @@ protected:
                             << std::endl;
                 }
             }
-        }
+        }*/
     }
 
 public:    

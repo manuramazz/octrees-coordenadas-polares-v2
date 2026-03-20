@@ -9,7 +9,7 @@
 #include "structures/nanoflann.hpp"
 #include "structures/nanoflann_wrappers.hpp"
 #include "structures/octree.hpp"
-#include "structures/unibn_octree.hpp"ç
+#include "structures/unibn_octree.hpp"
 #include "structures/octree_reordered.hpp"
 
 #include "benchmarking.hpp"
@@ -422,7 +422,7 @@ class NeighborsBenchmark {
 #endif
 
         template <Kernel_t kernel>
-        void benchmarkLinearOctree(LinearOctree<Container>& oct, const std::string_view& kernelName) {
+        void benchmarkLinearOctree(LinearOctree<Container>& oct, const std::string_view& kernelName, const OctreeReordered<LinearOctree<Container>, Container>& reordered, ReorderMode mode) {
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS)) {
                 auto neighborsSearch = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
@@ -650,23 +650,18 @@ class NeighborsBenchmark {
             void initializeBenchmarkLinearOctree() {
                 // Construcción del octree
                 LinearOctree<Container> oct(points, codes, box, enc);
-
-                // Guardamos el orden original de los puntos y códigos
-                Container originalPoints = points;
-                std::vector<key_t> originalCodes = codes;
+                std::cout << "[LOG] LinearOctree initialized.\n";
 
                 // Bucle sobre los modos de reordenación
                 for (ReorderMode mode : mainOptions.localReorders) {
 
-                    // Restaurar el orden original antes de aplicar la siguiente reordenación
-                    points = originalPoints;
-                    codes = originalCodes;
+                    //Declaración del objeto OctreeReordered a pasar por referencia
+                    OctreeReordered<std::decay_t<decltype(oct)>, Container> reordered;
 
                     if (mode != ReorderMode::None) {
-                        std::cout << "[LOG] Reordering mode "
-                        << (mode == ReorderMode::Cylindrical ? "Cylindrical" : "Spherical") << std::endl;
-
-                        OctreeReordered<decltype(oct), Container, key_t>::reorderLeavesLog(oct, points, &codes, nullptr, mode);
+                        std::cout << "[LOG] Reordering mode " << (mode == ReorderMode::Cylindrical ? "Cylindrical" : "Spherical") << std::endl;
+                        
+                        reordered.buildLeafPermutationsDebug(oct, points, mode);
 
                     } else {
                         std::cout << "[LOG] No reordering applied.\n";
@@ -676,16 +671,16 @@ class NeighborsBenchmark {
                     for (const auto& kernel : mainOptions.kernels) {
                         switch (kernel) {
                             case Kernel_t::sphere:
-                                benchmarkLinearOctree<Kernel_t::sphere>(oct, kernelToString(kernel));
+                                benchmarkLinearOctree<Kernel_t::sphere>(oct, kernelToString(kernel), reordered, mode);
                                 break;
                             case Kernel_t::circle:
-                                benchmarkLinearOctree<Kernel_t::circle>(oct, kernelToString(kernel));
+                                benchmarkLinearOctree<Kernel_t::circle>(oct, kernelToString(kernel), reordered, mode);
                                 break;
                             case Kernel_t::cube:
-                                benchmarkLinearOctree<Kernel_t::cube>(oct, kernelToString(kernel));
+                                benchmarkLinearOctree<Kernel_t::cube>(oct, kernelToString(kernel), reordered, mode);
                                 break;
                             case Kernel_t::square:
-                                benchmarkLinearOctree<Kernel_t::square>(oct, kernelToString(kernel));
+                                benchmarkLinearOctree<Kernel_t::square>(oct, kernelToString(kernel), reordered, mode);
                                 break;
                         }
                     }
