@@ -5,12 +5,15 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <iomanip>
 #include <numeric>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <type_traits>
 #include <omp.h>
+
+#include "octree_types.hpp"
 
 
 template<typename Octree_t, typename Container>
@@ -29,11 +32,6 @@ public:
     precomputar (dx,dy) una sola vez por hoja
     no calcular acos para todos los puntos*/
 
-    enum class OrderType {
-        K0 = 0,
-        K1 = 1,
-        K2 = 2
-    };
 
     struct LeafPermutations {
         std::array<std::vector<size_t>, 3> perms;
@@ -156,11 +154,13 @@ public:
                 return i < j;
             };
 
+            // ordenar por K0 usando angleLess (comparativa de cuadrantes + producto cruzado)
+
             auto& permK0 = leafPerms[leaf].perms[static_cast<int>(OrderType::K0)];
             std::sort(permK0.begin(), permK0.end(), angleLess);
 
             // --------------------------------
-            // ordenar cada permutación
+            // ordenar permutaciones por claves K1 y K2
             // --------------------------------
             for (int k = 0; k < 2; ++k)
             {
@@ -201,13 +201,13 @@ public:
             }
         };
 
-        auto previewPermutation = [&](const std::vector<size_t>& perm, size_t maxItems) {
+        auto previewPermutation = [&](const std::vector<size_t>& perm, const std::vector<double>& keys, size_t maxItems) {
             std::ostringstream oss;
             const size_t limit = std::min(maxItems, perm.size());
             for (size_t i = 0; i < limit; ++i) {
                 if (i > 0)
                     oss << ',';
-                oss << perm[i];
+                oss << perm[i] << '(' << std::fixed << std::setprecision(4) << keys[perm[i]] << ')';
             }
             if (perm.size() > limit)
                 oss << ",...";
@@ -366,8 +366,14 @@ public:
                     << " tid=" << tid
                     << " K0 sorted=" << (k0Sorted ? "OK" : "FAIL")
                     << " valid_perm=" << (k0Valid ? "OK" : "FAIL");
-                if (printPreview)
-                    oss << " preview=" << previewPermutation(permK0, 10);
+                if (printPreview) {
+                    // Recalcular atan2 solo para visualización en debug
+                    std::vector<double> k0Keys(count);
+                    for (size_t i = 0; i < count; ++i)
+                        k0Keys[i] = std::atan2(dyVals[i], dxVals[i]);
+
+                    oss << " preview=" << previewPermutation(permK0, k0Keys, 10);
+                }
                 debugLog(oss.str());
             }
 
@@ -397,7 +403,7 @@ public:
                         << " sorted=" << (sorted ? "OK" : "FAIL")
                         << " valid_perm=" << (valid ? "OK" : "FAIL");
                     if (printPreview)
-                        oss << " preview=" << previewPermutation(perm, 10);
+                        oss << " preview=" << previewPermutation(perm, keys[k], 10);
                     debugLog(oss.str());
                 }
             }

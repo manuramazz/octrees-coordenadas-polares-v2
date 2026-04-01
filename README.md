@@ -1,6 +1,5 @@
 # octrees-benchmark
-
-## Background
+./build/octrees-benchmark --kernels "sphere" -i "data/paris_lille/Lille_0.las" -o "out_tfg_v3/pruebasCodigo" -r "3.0" -s "5000" --sequential --repeats 1 --no-warmup -a "neighbors" -e "hilb" --local-reorder "none,spherical"
 
 LiDAR (Light and Ranging Detection) technology has now become the quintessential technique for collecting geospatial data from the earth's surface. This code implements a linearized octree based on ideas from Keller et al. and Behley et al. for fast fixed-radius neighbourhood searches, achieving better performance than other Octrees and KD-trees tested, such as nanoflann KD-tree, picoTree, PCL Octree and KD-Tree, and unibnOctree. We also analyze the performance of Morton and Hilbert Space Filling Curves (SFCs). SFC Reordering allows for faster searches and is essential for the construction of the linear Octree. Extensive benchmarking and result plotting code and scripts are also provided.
 		

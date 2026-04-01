@@ -1214,23 +1214,23 @@ public:
         singleTraversal(logBounds, logBoundsLeaf);
 	}
 
-      /***************************************************
+    /***************************************************
     Functions used to reorder points in each leaf 
     using their polar coordinates after the construction.
     ****************************************************/
     /// @brief Returns the number of leaves in the octree
-    size_t getNumLeaves() {
+    size_t getNumLeaves() const{
         return nLeaf;
     }
 
     /// @brief Returns the points ranges of the leaf with index i
-    std::pair<size_t, size_t> getLeafRange(size_t i) {
+    std::pair<size_t, size_t> getLeafRange(size_t i) const{
         assert(i < nLeaf && "Leaf index out of bounds");
         return internalRanges[i + nInternal];
     }
 
     /// @brief Returns the center of the leaf with index i
-    Point getLeafCenter(size_t i) {
+    Point getLeafCenter(size_t i) const{
         assert(i < nLeaf && "Leaf index out of bounds");
         return centers[i + nInternal];
     }

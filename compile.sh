@@ -2,7 +2,7 @@
 
 rm -rf build
 
-cmake -B build -DCMAKE_BUILD_TYPE=Release . -DBUILD_TESTS=OFF . -DFETCHCONTENT_FULLY_DISCONNECTED=ON .
+cmake -B build -DCMAKE_BUILD_TYPE=Release .
 
 cmake --build build -j$(nproc)
 
