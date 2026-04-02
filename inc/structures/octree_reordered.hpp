@@ -192,7 +192,7 @@ public:
         Octree_t& octree,
         Container& points,
         ReorderMode mode,
-        bool printPreview = true)
+        bool printPreview = false)
     {
         auto debugLog = [](const std::string& msg) {
             #pragma omp critical(octree_reordered_debug_log)
@@ -249,7 +249,7 @@ public:
             const int tid = omp_get_thread_num();
             auto [begin, end] = octree.getLeafRange(leaf);
             const size_t count = end - begin;
-            const bool logLeaf = (leaf < 10);
+            const bool logLeaf = (leaf < 100 && count > 0); // loguear solo las primeras hojas con puntos para no saturar la salida
 
             if (logLeaf) {
                 std::ostringstream oss;
@@ -258,17 +258,6 @@ public:
                     << " range=[" << begin << ',' << end << ")"
                     << " count=" << count;
                 debugLog(oss.str());
-            }
-
-            if (count <= 1) {
-                if (logLeaf) {
-                    std::ostringstream oss;
-                    oss << "[OctreeReordered::Debug] leaf=" << leaf
-                        << " tid=" << tid
-                        << " skipped (count<=1)";
-                    debugLog(oss.str());
-                }
-                continue;
             }
 
             const auto& center = octree.getLeafCenter(leaf);

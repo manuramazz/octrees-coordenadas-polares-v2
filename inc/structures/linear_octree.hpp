@@ -120,6 +120,9 @@ protected:
     /// @brief A simple vector containinf the radii of each level in the octree to speed up computations.
     std::vector<Vector> precomputedRadii;
 
+    /// @brief Maps a leaf index to the corresponding node index in the sorted internal arrays.
+    std::vector<size_t> leafNodeIndex;
+
     /**
      * @brief A reference to the array of points that we sort
      * @details At the beginning of the octree construction, this points are encoded and then sorted in-place in the order given by their
@@ -501,6 +504,7 @@ protected:
         inter.leafToInternal.resize(nTotal);
         centers.resize(nTotal);
         internalRanges.resize(nTotal);
+        leafNodeIndex.resize(nLeaf);
     }
 
     /**
@@ -528,6 +532,13 @@ protected:
         // Compute the reverse mapping leafToInternal
         for (uint32_t i = 0; i < nTotal; ++i) {
             inter.leafToInternal[inter.internalToLeaf[i]] = i;
+        }
+
+        // Store the sorted node index for every leaf so leaf queries do not depend on an implicit offset.
+        for (uint32_t i = 0; i < nTotal; ++i) {
+            if (inter.internalToLeaf[i] >= static_cast<int32_t>(nInternal)) {
+                leafNodeIndex[static_cast<size_t>(inter.internalToLeaf[i] - static_cast<int32_t>(nInternal))] = i;
+            }
         }
 
         // Offset by the number of internal nodes
@@ -587,6 +598,13 @@ protected:
         buildOctreeInternal(leaf, inter);
         computeGeometry(inter);
         tw.stop();
+        /*std::filesystem::path octreeLogPath = mainOptions.outputDirName / "linear_octree_structure.log";
+                std::filesystem::path pointsLogPath = mainOptions.outputDirName / "linear_octree_points.log";
+                std::ofstream octreeLogFile(octreeLogPath);
+                std::ofstream pointsLogFile(pointsLogPath);
+                if (octreeLogFile.is_open() && pointsLogFile.is_open()) {
+                    logOctree(octreeLogFile, pointsLogFile, leaf, inter);
+                }*/
         if(log)
             log->linearOctreeInternalTime = tw.getElapsedDecimalSeconds();
 
@@ -606,8 +624,7 @@ protected:
             ));
         }
         /*
-        for (size_t leaf = 0; leaf < nLeaf; leaf++) {
-            if(leaf<500){
+        for (size_t leaf = 0; leaf < 500; leaf++) {
                 auto [begin, end] = getLeafRange(leaf);
 
                 if (end - begin > mainOptions.maxPointsLeaf) {
@@ -617,7 +634,6 @@ protected:
                             << " end=" << end
                             << std::endl;
                 }
-            }
         }*/
     }
 
@@ -1223,16 +1239,33 @@ public:
         return nLeaf;
     }
 
-    /// @brief Returns the points ranges of the leaf with index i
-    std::pair<size_t, size_t> getLeafRange(size_t i) const{
+    /// @brief Returns the sorted node index for a leaf index.
+    size_t getLeafNodeIndex(size_t i) const {
         assert(i < nLeaf && "Leaf index out of bounds");
-        return internalRanges[i + nInternal];
+        assert(i < leafNodeIndex.size() && "Leaf node index out of bounds");
+        return leafNodeIndex[i];
     }
 
-    /// @brief Returns the center of the leaf with index i
-    Point getLeafCenter(size_t i) const{
+    /// @brief Returns the points ranges of the leaf with index i using the construction-aware mapping.
+    std::pair<size_t, size_t> getLeafRangeByLeafIndex(size_t i) const{
         assert(i < nLeaf && "Leaf index out of bounds");
-        return centers[i + nInternal];
+        return internalRanges[getLeafNodeIndex(i)];
+    }
+
+    /// @brief Returns the center of the leaf with index i using the construction-aware mapping.
+    Point getLeafCenterByLeafIndex(size_t i) const{
+        assert(i < nLeaf && "Leaf index out of bounds");
+        return centers[getLeafNodeIndex(i)];
+    }
+
+    /// @brief Backward-compatible leaf range getter.
+    std::pair<size_t, size_t> getLeafRange(size_t i) const{
+        return getLeafRangeByLeafIndex(i);
+    }
+
+    /// @brief Backward-compatible leaf center getter.
+    Point getLeafCenter(size_t i) const{
+        return getLeafCenterByLeafIndex(i);
     }
     /***************************************************
     End of functions used in the reordering process
