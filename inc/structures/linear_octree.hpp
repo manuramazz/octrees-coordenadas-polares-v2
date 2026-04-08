@@ -2,9 +2,13 @@
 
 #include <optional>
 #include <bitset>
+#include <cassert>
 #include <fstream>
 #include <unordered_map>
 #include <filesystem>
+#include <functional>
+#include <tuple>
+#include <type_traits>
 #include "benchmarking/build_log.hpp"
 #include "benchmarking/time_watcher.hpp"
 #include "encoding/no_encoding.hpp"
@@ -107,6 +111,7 @@ protected:
 
     /**
      * The next 4 arrays contain the important information for neighbor searches
+     * Edit: added persistent internalToLeaf to map nodes to leaf indexes to access leaf index in order to do range selection 
      */
     /// @brief Index of the first child of each node (if 0 we have a leaf). This is the array used during DFS Octree searches.
     std::vector<uint32_t> offsets;
@@ -122,6 +127,9 @@ protected:
 
     /// @brief Maps a leaf index to the corresponding node index in the sorted internal arrays.
     std::vector<size_t> leafNodeIndex;
+
+    /// @brief Maps each sorted node index to its leaf index (-1 for internal nodes).
+    std::vector<int32_t> internalToLeaf;
 
     /**
      * @brief A reference to the array of points that we sort
@@ -505,6 +513,7 @@ protected:
         centers.resize(nTotal);
         internalRanges.resize(nTotal);
         leafNodeIndex.resize(nLeaf);
+        internalToLeaf.resize(nTotal);
     }
 
     /**
@@ -545,6 +554,9 @@ protected:
         for (uint32_t i = 0; i < nTotal; ++i) {
             inter.internalToLeaf[i] -= nInternal;
         }
+
+        // Persist sorted node -> leaf mapping for search-time range pruning.
+        this->internalToLeaf = inter.internalToLeaf;
 
         // Find the LO array
         getLevelRange(inter);
@@ -638,6 +650,8 @@ protected:
     }
 
 public:    
+    using RangeFn = std::function<std::tuple<const std::vector<size_t>*, size_t, size_t>(uint32_t, const Point&, double)>;
+
     /**
      * @brief Builds the linear octree given an array of points, also reporting how much time each step takes
      * 
@@ -685,6 +699,10 @@ public:
      */
     template<class C, class A>
     void singleTraversal(C&& continuationCriterion, A&& endpointAction) const {
+        assert(nTotal > 0 && "singleTraversal requires a non-empty octree");
+        assert(offsets.size() >= nTotal && "offsets must contain at least one entry per node");
+        assert(precomputedRadii.size() > 0 && "precomputedRadii must not be empty");
+
         bool descend = continuationCriterion(0, 0);
         if (!descend) return;
 
@@ -701,10 +719,19 @@ public:
         uint32_t node = 0; // Start at the root
         uint32_t currDepth = 0;
         do {
+            assert(node < nTotal && "node index out of bounds in traversal");
+            assert(node < offsets.size() && "node index out of bounds for offsets");
+
+            const uint32_t firstChild = offsets[node];
+            assert(firstChild + OCTANTS_PER_NODE <= nTotal && "child range out of bounds in traversal");
+
             for (int octant = 0; octant < OCTANTS_PER_NODE; ++octant) {
-                uint32_t child = offsets[node] + octant;
+                uint32_t child = firstChild + octant;
+                assert(child < nTotal && "child index out of bounds in traversal");
+                assert(currDepth + 1 < precomputedRadii.size() && "depth out of bounds for precomputedRadii");
                 bool descend = continuationCriterion(child, currDepth + 1);
                 if (descend) {
+                    assert(child < offsets.size() && "child index out of bounds for offsets");
                     if (offsets[child] == 0) {
                         // Leaf node reached
                         endpointAction(child);
@@ -726,9 +753,14 @@ public:
      * @return Points inside the given kernel type.
      */
     template<typename Kernel>
-    [[nodiscard]] NeighborSet<Container> neighborsStruct(const Kernel& k) const {
+    [[nodiscard]] NeighborSet<Container> neighborsStruct(const Kernel& k, const RangeFn& getRange = nullptr) const {
         NeighborSet<Container> result(&points);
+        const double searchRadius = k.radii().getX();
         auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsStruct::checkBoxIntersect");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(currDepth < this->precomputedRadii.size() && "currDepth out of bounds for precomputedRadii");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
             auto nodeCenter = this->centers[nodeIndex];
             auto nodeRadii = this->precomputedRadii[currDepth];
             switch (k.boxIntersect(nodeCenter, nodeRadii)) {
@@ -748,8 +780,35 @@ public:
         
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsStruct::findAndInsertPoints");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
             size_t startIndex = this->internalRanges[nodeIndex].first;
             size_t endIndex = this->internalRanges[nodeIndex].second;
+            assert(startIndex <= endIndex && "invalid range in internalRanges");
+            assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+
+            if (getRange) {
+                assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
+                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+                if (leafIndex >= 0) {
+                    assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsStruct");
+                    const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    if (perm != nullptr) {
+                        assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
+                        assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
+                        for (size_t i = iMin; i < iMax; ++i) {
+                            const size_t pointIndex = startIndex + (*perm)[i];
+                            assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
+                            assert(pointIndex < points.size() && "pointIndex out of points bounds in neighborsStruct");
+                            if (pointIndex < endIndex && k.isInside(points[pointIndex])) {
+                                result.addRange(pointIndex, pointIndex + 1);
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+
             size_t rangeStart = startIndex;
             
             for (size_t i = startIndex; i < endIndex; ++i) {
@@ -777,9 +836,14 @@ public:
      * @return Points inside the given kernel type.
      */
     template<typename Kernel>
-    [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k) const {
+    [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k, const RangeFn& getRange = nullptr) const {
         std::vector<size_t> ptsInside;
+        const double searchRadius = k.radii().getX();
         auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::checkBoxIntersect");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(currDepth < this->precomputedRadii.size() && "currDepth out of bounds for precomputedRadii");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
             auto nodeCenter = this->centers[nodeIndex];
             auto nodeRadii = this->precomputedRadii[currDepth];
             switch (k.boxIntersect(nodeCenter, nodeRadii)) {
@@ -787,6 +851,8 @@ public:
                     // Completely inside, all add points and prune
                     size_t startIndex = this->internalRanges[nodeIndex].first;
                     size_t endIndex = this->internalRanges[nodeIndex].second;
+                    assert(startIndex <= endIndex && "invalid range in internalRanges");
+                    assert(endIndex <= points.size() && "internalRanges points end out of bounds");
                     for (size_t i = startIndex; i < endIndex; ++i) {
                         ptsInside.push_back(i);
                     }
@@ -803,8 +869,35 @@ public:
         
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::findAndInsertPoints");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
             size_t startIndex = this->internalRanges[nodeIndex].first;
             size_t endIndex = this->internalRanges[nodeIndex].second;
+            assert(startIndex <= endIndex && "invalid range in internalRanges");
+            assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+
+            if (getRange) {
+                assert(nodeIndex < this->leafNodeIndex.size() && "nodeIndex out of bounds for internalToLeaf");
+                const int32_t leafIndex = this->leafNodeIndex[nodeIndex];
+                if (leafIndex >= 0) {
+                    assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
+                    const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    if (perm != nullptr) {
+                        assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
+                        assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
+                        for (size_t i = iMin; i < iMax; ++i) {
+                            const size_t pointIndex = startIndex + (*perm)[i];
+                            assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
+                            assert(pointIndex < points.size() && "pointIndex out of points bounds in neighborsPrune");
+                            if (k.isInside(points[pointIndex])) {
+                                ptsInside.push_back(pointIndex);
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(points[i])) {
                     ptsInside.push_back(i);
@@ -826,18 +919,57 @@ public:
      * The signature of the function should be equivalent to `bool cnd(const typename &p);`
      * @return Points inside the given kernel type and satisfying condition.
      */
-    template<typename Kernel, typename Function>
-    [[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, Function&& condition) const {
+    template<typename Kernel, typename Function, typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
+    [[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, Function&& condition, const RangeFn& getRange = nullptr) const {
         std::vector<size_t> ptsInside;
+        const double searchRadius = k.radii().getX();
 
         auto intersectsKernel = [&](uint32_t nodeIndex, uint32_t nodeDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighbors::intersectsKernel");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(nodeDepth < this->precomputedRadii.size() && "nodeDepth out of bounds for precomputedRadii");
             return k.boxOverlap(this->centers[nodeIndex], this->precomputedRadii[nodeDepth]);
         };
         
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
+
+            //POLAR COORD OPTIMIZACION
+            // getRange returnes the permutation of the leaf points sorted by the most optimal key for each leaf
+            // Also returns the range of points in the permutation that are inside the search radius, so we can skip points that are outside of it without checking them
+            
+            //We only check sorted local indexes [iMin, iMax) converted to global indexes with the perm vector + internalRanges[nodeIndex].first
+
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighbors::findAndInsertPoints");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
             size_t startIndex = this->internalRanges[nodeIndex].first;
             size_t endIndex = this->internalRanges[nodeIndex].second;
+            assert(startIndex <= endIndex && "invalid range in internalRanges");
+            assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+
+            if (getRange) {
+                assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
+                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+                if (leafIndex >= 0) {
+                    assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighbors");
+                    const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    if (perm != nullptr) {
+                        assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
+                        assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
+                        for (size_t i = iMin; i < iMax; ++i) {
+                            const size_t pointIndex = startIndex + (*perm)[i];
+                            assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
+                            assert(pointIndex < points.size() && "pointIndex out of points bounds in neighbors");
+                            if (k.isInside(points[pointIndex]) && condition(points[pointIndex])) {
+                                ptsInside.push_back(pointIndex);
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+
+            // Normal case, check all points in the leaf
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(points[i]) && condition(points[i])) {
                     ptsInside.push_back(i);
@@ -847,6 +979,12 @@ public:
         singleTraversal(intersectsKernel, findAndInsertPoints);
         return ptsInside;
 	}
+
+    template<typename Kernel>
+    [[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, const RangeFn& getRange = nullptr) const {
+        constexpr auto dummyCondition = [](const Point&) { return true; };
+        return neighbors(k, dummyCondition, getRange);
+    }
 
     // Helper for kNN searches
     struct OctantPointIndex {
@@ -930,6 +1068,12 @@ public:
      * @param[out] dists the vector of point cloud distances returned
      */
     size_t knn(const Point& p, const size_t k, std::vector<size_t> &indexes, std::vector<double> &dists) const {
+        assert(nTotal > 0 && "knn requires a non-empty octree");
+        assert(offsets.size() >= nTotal && "offsets must contain at least one entry per node");
+        assert(internalRanges.size() >= nTotal && "internalRanges must contain at least one entry per node");
+        assert(centers.size() >= nTotal && "centers must contain at least one entry per node");
+        assert(precomputedRadii.size() > 0 && "precomputedRadii must not be empty");
+
         // Initialize the min-distances heap with the root octant
         std::vector<OctantPointIndex> heap;
         heap.reserve(std::max((size_t) 512, k / 2));
@@ -940,16 +1084,23 @@ public:
         // NOTE: No need to check heap.empty() since 
         // we have, at the very least, maxPoints points and 1 octant
         size_t inserted = 0, maxPoints = std::min(points.size(), k);
+        assert(indexes.size() >= maxPoints && "indexes output vector too small for kNN result");
+        assert(dists.size() >= maxPoints && "dists output vector too small for kNN result");
         while(inserted < maxPoints) {
+            assert(!heap.empty() && "kNN heap unexpectedly empty");
             std::pop_heap(heap.begin(), heap.end());
             OctantPointIndex top = heap.back();
             heap.pop_back();
             if(top.isOctant) {
+                assert(top.index < nTotal && "octant index out of bounds in knn");
                 if(offsets[top.index] == 0) {
                     // Leaf node, push points into the queue
                     size_t startIndex = this->internalRanges[top.index].first;
                     size_t endIndex = this->internalRanges[top.index].second;
+                    assert(startIndex <= endIndex && "invalid range in internalRanges");
+                    assert(endIndex <= points.size() && "internalRanges points end out of bounds");
                     for (size_t i = startIndex; i < endIndex; ++i) {
+                        assert(i < points.size() && "point index out of bounds in knn leaf expansion");
                         double sqDist = distPointsSquared(p, points[i]);
                         heap.emplace_back(i, false, 0, sqDist);
                         std::push_heap(heap.begin(), heap.end());
@@ -957,8 +1108,12 @@ public:
                 } else {
                     // Internal node, push child octants into the queue
                     uint8_t childDepth = top.depth + 1;
+                    assert(childDepth < precomputedRadii.size() && "childDepth out of bounds for precomputedRadii in knn");
+                    assert(offsets[top.index] + OCTANTS_PER_NODE <= nTotal && "child octant range out of bounds in knn");
                     for (int octant = 0; octant < OCTANTS_PER_NODE; ++octant) {
                         size_t childOctIndex = offsets[top.index] + octant;
+                        assert(childOctIndex < nTotal && "child octant index out of bounds in knn");
+                        assert(childOctIndex < centers.size() && "child octant index out of bounds for centers in knn");
                         double sqDist = distPointOctantSquared(p, centers[childOctIndex], precomputedRadii[childDepth]);
                         heap.emplace_back(childOctIndex, true, childDepth, sqDist);
                         std::push_heap(heap.begin(), heap.end());
@@ -966,6 +1121,8 @@ public:
                 }   
             } else {
                 // Insert point directly into result
+                assert(top.index < points.size() && "point index out of bounds in knn result insertion");
+                assert(inserted < indexes.size() && inserted < dists.size() && "output insertion index out of bounds in knn");
                 indexes[inserted] = top.index;
                 dists[inserted] = top.sqDist;
                 inserted++;
@@ -1013,7 +1170,12 @@ public:
     template<typename Kernel>
     [[nodiscard]] NeighborSet<Container> neighborsApprox(const Kernel& k, uint32_t precisionLevel, bool upperBound) const {
         NeighborSet<Container> result(&points);
+        assert(precisionLevel <= maxDepthSeen && "precisionLevel exceeds maxDepthSeen");
         auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsApprox::checkBoxIntersect");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(currDepth < this->precomputedRadii.size() && "currDepth out of bounds for precomputedRadii");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
             auto nodeCenter = this->centers[nodeIndex];
             auto nodeRadii = this->precomputedRadii[currDepth];
             if(currDepth > precisionLevel) {
@@ -1042,8 +1204,12 @@ public:
         
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsApprox::findAndInsertPoints");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
             size_t startIndex = this->internalRanges[nodeIndex].first;
             size_t endIndex = this->internalRanges[nodeIndex].second;
+            assert(startIndex <= endIndex && "invalid range in internalRanges");
+            assert(endIndex <= points.size() && "internalRanges points end out of bounds");
 
             size_t rangeStart = startIndex;
             size_t rangeEnd = startIndex;
@@ -1069,54 +1235,54 @@ public:
 
     // Overrides for working with a given radius/vector of radii before calling the actual search methods
     template<Kernel_t kernel_type = Kernel_t::square>
-	[[nodiscard]] inline NeighborSet<Container> neighborsStruct(const Point& p, double radius) const {
+    [[nodiscard]] inline NeighborSet<Container> neighborsStruct(const Point& p, double radius, const RangeFn& getRange = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-		return neighborsStruct(kernel);
+        return neighborsStruct(kernel, getRange);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
-	[[nodiscard]] inline NeighborSet<Container> neighborsStruct(const Point& p, const Vector& radii) const {
+    [[nodiscard]] inline NeighborSet<Container> neighborsStruct(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-		return neighborsStruct(kernel);
+        return neighborsStruct(kernel, getRange);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::square>
-	[[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, double radius) const {
+    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, double radius, const RangeFn& getRange = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-		return neighborsPrune(kernel);
+        return neighborsPrune(kernel, getRange);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
-	[[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, const Vector& radii) const {
+    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-		return neighborsPrune(kernel);
+        return neighborsPrune(kernel, getRange);
 	}
 
     template<Kernel_t kernel_type = Kernel_t::square>
-	[[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius) const {
+    [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius, const RangeFn& getRange = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-		constexpr auto dummyCondition = [](const Point&) { return true; };
-		return neighbors(kernel, dummyCondition);
+        return neighbors(kernel, getRange);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
-	[[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, const Vector& radii) const {
+    [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-		constexpr auto dummyCondition = [](const Point&) { return true; };
-		return neighbors(kernel, dummyCondition);
+        return neighbors(kernel, getRange);
 	}
 
-	template<Kernel_t kernel_type = Kernel_t::square, class Function>
-	[[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius, Function&& condition) const {
+    template<Kernel_t kernel_type = Kernel_t::square, class Function,
+             typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
+    [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius, Function&& condition, const RangeFn& getRange = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-		return neighbors(kernel, std::forward<Function&&>(condition));
+        return neighbors(kernel, std::forward<Function>(condition), getRange);
 	}
 
-	template<Kernel_t kernel_type = Kernel_t::square, class Function>
+    template<Kernel_t kernel_type = Kernel_t::square, class Function,
+             typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
 	[[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, const Vector& radii,
-	                                                          Function&& condition) const {
+                                                              Function&& condition, const RangeFn& getRange = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-		return neighbors(kernel, std::forward<Function&&>(condition));
+        return neighbors(kernel, std::forward<Function>(condition), getRange);
 	}
 
     template<Kernel_t kernel_type = Kernel_t::square>

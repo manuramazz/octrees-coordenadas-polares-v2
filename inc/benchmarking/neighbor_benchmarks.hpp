@@ -52,10 +52,11 @@ class NeighborsBenchmark {
          */
         template <typename ParameterType>
         inline void appendToCsv(SearchAlgo algo, std::string_view kernel, ParameterType main_parameter, const benchmarking::Stats<>& stats, 
-                                size_t averageResultSize = 0, int numThreads = omp_get_max_threads(), double tolerancePercentage = 0.0) {
+                                std::string_view reorderMode = "none", size_t averageResultSize = 0,
+                                int numThreads = omp_get_max_threads(), double tolerancePercentage = 0.0) {
             // Check if the file is empty and append header if it is
             if (outputFile.tellp() == 0) {
-                outputFile <<   "date,octree,point_type,encoder,npoints,operation,kernel,radius,num_searches,sequential_searches,repeats,"
+                outputFile <<   "date,octree,point_type,encoder,npoints,operation,kernel,radius,reorder,num_searches,sequential_searches,repeats,"
                                 "accumulated,mean,median,stdev,used_warmup,warmup_time,avg_result_size,tolerance_percentage,"
                                 "openmp_threads,openmp_schedule\n";
             }
@@ -88,6 +89,7 @@ class NeighborsBenchmark {
                 << fullAlgoName << ',' 
                 << kernel << ',' 
                 << main_parameter << ','
+                << reorderMode << ','
                 << searchSet.numSearches << ',' 
                 << sequentialSearches << ','
                 << stats.size() << ','
@@ -105,12 +107,13 @@ class NeighborsBenchmark {
         }
         template <typename ParameterType>
         inline void appendToCsv(SearchAlgo algo, std::string_view kernel, ParameterType main_parameter, const benchmarking::Stats<>& stats, 
-                                std::vector<long long> &eventValues, size_t averageResultSize = 0, 
+                                std::vector<long long> &eventValues, std::string_view reorderMode = "none",
+                                size_t averageResultSize = 0, 
                                 int numThreads = omp_get_max_threads(), double tolerancePercentage = 0.0
                                 ) {
             // Check if the file is empty and append header if it is
             if (outputFile.tellp() == 0) {
-                outputFile <<   "date,octree,point_type,encoder,npoints,operation,kernel,radius,num_searches,sequential_searches,repeats,"
+                outputFile <<   "date,octree,point_type,encoder,npoints,operation,kernel,radius,reorder,num_searches,sequential_searches,repeats,"
                                 "accumulated,mean,median,stdev,used_warmup,warmup_time,avg_result_size,tolerance_percentage,"
                                 "openmp_threads,openmp_schedule,l1d_miss,l2d_miss,l3_miss\n";
             }
@@ -143,6 +146,7 @@ class NeighborsBenchmark {
                 << fullAlgoName << ',' 
                 << kernel << ',' 
                 << main_parameter << ','
+                << reorderMode << ','
                 << searchSet.numSearches << ',' 
                 << sequentialSearches << ','
                 << stats.size() << ','
@@ -236,7 +240,8 @@ class NeighborsBenchmark {
             std::cout << std::endl;
         }
         
-        void executeBenchmark(const std::function<size_t(double)>& searchCallback, std::string_view kernelName, SearchAlgo algo) {
+        void executeBenchmark(const std::function<size_t(double)>& searchCallback, std::string_view kernelName, SearchAlgo algo,
+                      std::string_view reorderMode = "none") {
             std::cout << "  Running " << searchAlgoToString(algo) << " on kernel " << kernelName << std::endl;
             const auto& radii = mainOptions.benchmarkRadii;
             const size_t repeats = mainOptions.repeats;
@@ -258,12 +263,12 @@ class NeighborsBenchmark {
                             return searchCallback(radius); 
                         }, mainOptions.useWarmup, eventSet, eventValues.data());
                         printPapiResults(events, descriptions, eventValues);
-                        appendToCsv(algo, kernelName, radius, stats, eventValues, averageResultSize, numberOfThreads);
+                        appendToCsv(algo, kernelName, radius, stats, eventValues, reorderMode, averageResultSize, numberOfThreads);
                     } else {
                         auto [stats, averageResultSize] = benchmarking::benchmark<size_t>(repeats, [&]() { 
                             return searchCallback(radius); 
                         }, mainOptions.useWarmup);
-                        appendToCsv(algo, kernelName, radius, stats, averageResultSize, numberOfThreads);
+                        appendToCsv(algo, kernelName, radius, stats, reorderMode, averageResultSize, numberOfThreads);
                     }
                     searchSet.reset();
                     std::cout << std::setprecision(2);
@@ -297,12 +302,12 @@ class NeighborsBenchmark {
                             return knnSearchCallback(k); 
                         }, mainOptions.useWarmup, eventSet, eventValues.data());
                         printPapiResults(events, descriptions, eventValues);
-                        appendToCsv(algo, "KNN", k, stats, eventValues, averageResultSize, numberOfThreads);
+                        appendToCsv(algo, "KNN", k, stats, eventValues, "none", averageResultSize, numberOfThreads);
                     } else {
                         auto [stats, averageResultSize] = benchmarking::benchmark<size_t>(repeats, [&]() { 
                             return knnSearchCallback(k); 
                         }, mainOptions.useWarmup);
-                        appendToCsv(algo, "KNN", k, stats, averageResultSize, numberOfThreads);
+                        appendToCsv(algo, "KNN", k, stats, "none", averageResultSize, numberOfThreads);
                     }
                     searchSet.reset();
                     std::cout << std::setprecision(2);
@@ -331,7 +336,7 @@ class NeighborsBenchmark {
                     searchSet.nextRepeat();
                     return averageResultSize;
                 };
-                executeBenchmark(neighborsNanoflannKDTree, kernelName, SearchAlgo::NEIGHBORS_NANOFLANN);
+                executeBenchmark(neighborsNanoflannKDTree, kernelName, SearchAlgo::NEIGHBORS_NANOFLANN, "none");
             }
         }
 
@@ -382,7 +387,7 @@ class NeighborsBenchmark {
                     searchSet.nextRepeat();
                     return averageResultSize;
                 };
-                executeBenchmark(neighborsUnibn, kernelName, SearchAlgo::NEIGHBORS_UNIBN);
+                executeBenchmark(neighborsUnibn, kernelName, SearchAlgo::NEIGHBORS_UNIBN, "none");
             }
         }
         
@@ -427,7 +432,7 @@ class NeighborsBenchmark {
                     return averageResultSize;
                 };
                 
-                executeBenchmark(neighborsPCLOct, kernelName, SearchAlgo::NEIGHBORS_PCLOCT);
+                executeBenchmark(neighborsPCLOct, kernelName, SearchAlgo::NEIGHBORS_PCLOCT, "none");
             }
         }
 
@@ -469,7 +474,7 @@ class NeighborsBenchmark {
                     return averageResultSize;
                 };
                 
-                executeBenchmark(neighborsPCLKD, kernelName, SearchAlgo::NEIGHBORS_PCLKD);
+                executeBenchmark(neighborsPCLKD, kernelName, SearchAlgo::NEIGHBORS_PCLKD, "none");
             }
         }
 
@@ -477,35 +482,47 @@ class NeighborsBenchmark {
 
         template <Kernel_t kernel>
         void benchmarkLinearOctree(LinearOctree<Container>& oct, const std::string_view& kernelName, const OctreeReordered<LinearOctree<Container>, Container>& reordered, ReorderMode mode) {
+            typename LinearOctree<Container>::RangeFn getRange = nullptr;
+            const std::string_view reorderModeStr = localReorderTypeToString(mode);
+
+            if (mode != ReorderMode::None) {
+                getRange = [&](uint32_t leafIndex, const Point& query, double radius) {
+                    PrunedRange range = bestRange(leafIndex, query, radius, kernel,
+                                                oct, points, reordered, mode, false);
+                    const auto& perm = reordered.getLeafPermutation(leafIndex, range.order);
+                    return std::make_tuple(&perm, range.iMin, range.iMax);
+                };
+            }
+
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS)) {
                 auto neighborsSearch = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
                     #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                         for(size_t i = 0; i<searchSet.numSearches; i++) {
-                            auto result = oct.template neighbors<kernel>(points[searchIndexes[i]], radius);
+                            auto result = oct.template neighbors<kernel>(points[searchIndexes[i]], radius, getRange);
                             averageResultSize += result.size();
                         }
                     averageResultSize /= searchSet.numSearches;
                     searchSet.nextRepeat();
                     return averageResultSize;
                 };
-                executeBenchmark(neighborsSearch, kernelName, SearchAlgo::NEIGHBORS);
+                executeBenchmark(neighborsSearch, kernelName, SearchAlgo::NEIGHBORS, reorderModeStr);
             }
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS_PRUNE)) {
                 auto neighborsSearchPrune = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
-                    #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                    //#pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                         for(size_t i = 0; i<searchSet.numSearches; i++) {
-                            auto result = oct.template neighborsPrune<kernel>(points[searchIndexes[i]], radius);
+                            auto result = oct.template neighborsPrune<kernel>(points[searchIndexes[i]], radius, getRange);
                             averageResultSize += result.size();
                         }
                     averageResultSize /= searchSet.numSearches;
                     searchSet.nextRepeat();
                     return averageResultSize;
                 };
-                executeBenchmark(neighborsSearchPrune, kernelName, SearchAlgo::NEIGHBORS_PRUNE);
+                executeBenchmark(neighborsSearchPrune, kernelName, SearchAlgo::NEIGHBORS_PRUNE, reorderModeStr);
             }
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS_STRUCT)) {
                 auto neighborsSearchStruct = [&](double radius) -> size_t {
@@ -513,14 +530,14 @@ class NeighborsBenchmark {
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
                     #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                         for(size_t i = 0; i<searchSet.numSearches; i++) {
-                            auto result = oct.template neighborsStruct<kernel>(points[searchIndexes[i]], radius);
+                            auto result = oct.template neighborsStruct<kernel>(points[searchIndexes[i]], radius, getRange);
                             averageResultSize += result.size();
                         }
                     averageResultSize /= searchSet.numSearches;
                     searchSet.nextRepeat();
                     return averageResultSize;
                 };
-                executeBenchmark(neighborsSearchStruct, kernelName, SearchAlgo::NEIGHBORS_STRUCT);
+                executeBenchmark(neighborsSearchStruct, kernelName, SearchAlgo::NEIGHBORS_STRUCT, reorderModeStr);
             }
         }
 
@@ -559,7 +576,7 @@ class NeighborsBenchmark {
                     searchSet.nextRepeat();
                     return averageResultSize;
                 };
-                executeBenchmark(neighborsPtrSearch, kernelName, SearchAlgo::NEIGHBORS_PTR);
+                executeBenchmark(neighborsPtrSearch, kernelName, SearchAlgo::NEIGHBORS_PTR, "none");
             }
         }
 #ifdef HAVE_PICOTREE
@@ -582,7 +599,7 @@ class NeighborsBenchmark {
                     return averageResultSize;
                 };
                 
-                executeBenchmark(neighborsPico, kernelName, SearchAlgo::NEIGHBORS_PICOTREE);
+                executeBenchmark(neighborsPico, kernelName, SearchAlgo::NEIGHBORS_PICOTREE, "none");
             }
         }
 
@@ -723,7 +740,7 @@ class NeighborsBenchmark {
                     
                     // Bucle sobre kernels
                     for (const auto& kernel : mainOptions.kernels) {
-                        debugRangeSelector(oct, reordered, mode, kernel);
+                        //debugRangeSelector(oct, reordered, mode, kernel);
                         switch (kernel) {
                             case Kernel_t::sphere:
                                 benchmarkLinearOctree<Kernel_t::sphere>(oct, kernelToString(kernel), reordered, mode);

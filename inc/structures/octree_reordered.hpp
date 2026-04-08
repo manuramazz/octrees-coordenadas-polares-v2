@@ -58,6 +58,10 @@ public:
         #pragma omp parallel for schedule(dynamic)
         for (size_t leaf = 0; leaf < numLeaves; ++leaf)
         {
+            // debug openMP (print numero de hilo y rango de la hoja)
+            int threadId = omp_get_thread_num();
+            /*if (leaf < 20) // loguear solo las primeras hojas para no saturar la salida
+            std::cout << "Thread " << threadId << ": Processing leaf " << leaf << std::endl;*/
             auto [begin, end] = octree.getLeafRange(leaf);
             size_t count = end - begin;
 

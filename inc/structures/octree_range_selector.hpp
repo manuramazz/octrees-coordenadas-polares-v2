@@ -133,6 +133,7 @@ PrunedRange computeRange(
     if (order == OrderType::K1) {
         if (mode == ReorderMode::Spherical) {
             if (d <= eps) return full;
+            if (rEff >= d) return full;
             const double thetaQ    = std::acos(std::clamp(dz / d, -1.0, 1.0));
             const double deltaTheta = std::asin(std::clamp(rEff / d, 0.0, 1.0));
             return {lowerIdx(std::max(0.0, thetaQ - deltaTheta)),
@@ -150,7 +151,7 @@ PrunedRange computeRange(
     const double kMinRaw = phiQ - deltaPhi;
     const double kMaxRaw = phiQ + deltaPhi;
 
-    if (kMinRaw < 0.0 && kMaxRaw >= detail::kTwoPi)
+    if (kMinRaw < 0.0 || kMaxRaw >= detail::kTwoPi)
         return full;                                  // el rango cubre todo el círculo 
     /*if (kMinRaw < 0.0)
         return {0, upperIdx(kMaxRaw), order};          // aprovecha la mitad alta
@@ -170,7 +171,7 @@ PrunedRange bestRange(
     const Container& points,
     const Reordered_t& reordered,
     ReorderMode mode,
-    bool logging = true)
+    bool logging = false)
 {
     const auto [begin, end] = octree.getLeafRange(leaf);
     PrunedRange best{0, end - begin, OrderType::K0};
