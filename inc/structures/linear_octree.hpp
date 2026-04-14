@@ -875,10 +875,12 @@ public:
             size_t endIndex = this->internalRanges[nodeIndex].second;
             assert(startIndex <= endIndex && "invalid range in internalRanges");
             assert(endIndex <= points.size() && "internalRanges points end out of bounds");
-
+            
+            // If getRange provided -> uses polar coords optimization
+            // Only checks points inside range returned by bestRange (from octree_range_selector)
             if (getRange) {
-                assert(nodeIndex < this->leafNodeIndex.size() && "nodeIndex out of bounds for internalToLeaf");
-                const int32_t leafIndex = this->leafNodeIndex[nodeIndex];
+                assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
+                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
                     const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
