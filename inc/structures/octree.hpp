@@ -364,6 +364,30 @@ class Octree
 
 	void writeOctree(std::ofstream& f, size_t index) const;
 
+
+	/*************************************************************** 
+	*** Public functions exposed for local reordering operations ***
+	***************************************************************/
+
+	private:
+		std::vector<const Octree*> leaves_;  // pointer to leafs
+	public:
+		void collectLeaves();  // llamar después de buildOctree
+
+		[[nodiscard]] size_t getNumLeaves() const { 
+			return leaves_.size(); 
+		}
+
+		[[nodiscard]] Point getLeafCenter(size_t i) const {
+			return leaves_[i]->center_;
+		}
+
+		[[nodiscard]] const std::vector<size_t>& getLeafPoints(size_t i) const {
+			return leaves_[i]->points_;
+		}
+
+
+
 	// TODO add this back (not really needed though)
 	// void    extractPoint(const Point* p);
 	// Point* extractPoint();

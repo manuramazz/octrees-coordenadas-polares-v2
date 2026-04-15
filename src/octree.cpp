@@ -22,6 +22,7 @@ Octree<Container>::Octree(Container& container, Box box)
     std::vector<size_t> allIndices(container.size());
     std::iota(allIndices.begin(), allIndices.end(), 0);
     buildOctree(allIndices);
+	collectLeaves();
 }
 
 template <PointContainer Container>
@@ -32,6 +33,7 @@ Octree<Container>::Octree(Container& container)
     std::vector<size_t> allIndices(container.size());
     std::iota(allIndices.begin(), allIndices.end(), 0);
     buildOctree(allIndices);
+	collectLeaves();
 }
 
 template <PointContainer Container>
@@ -47,6 +49,7 @@ Octree<Container>::Octree(Container& container, Point center, Vector radii, std:
 {
     octants_.reserve(OCTANTS_PER_NODE);
     buildOctree(points);
+	collectLeaves();
 }
 
 /// @brief Fill the missing data in the octree log for the Pointer-based Octree 
@@ -362,6 +365,28 @@ void Octree<Container>::writeOctree(std::ofstream& f, size_t index) const
         for (const auto& octant : octants_)
         {
             octant.writeOctree(f, index);
+        }
+    }
+}
+
+template <PointContainer Container>
+void Octree<Container>::collectLeaves() {
+    leaves_.clear();
+
+    std::vector<const Octree*> toVisit;
+    toVisit.push_back(this);
+
+    while (!toVisit.empty()) {
+        const Octree* node = toVisit.back();
+        toVisit.pop_back();
+
+        if (node->isLeaf()) {
+            if (!node->isEmpty())
+                leaves_.push_back(node);
+        } else {
+            for (const auto& child : node->getOctants()) {
+				toVisit.push_back(&child);
+			}
         }
     }
 }

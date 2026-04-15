@@ -60,11 +60,20 @@ public:
         {
             // debug openMP (print numero de hilo y rango de la hoja)
             int threadId = omp_get_thread_num();
-            /*if (leaf < 20) // loguear solo las primeras hojas para no saturar la salida
-            std::cout << "Thread " << threadId << ": Processing leaf " << leaf << std::endl;*/
-            auto [begin, end] = octree.getLeafRange(leaf);
-            size_t count = end - begin;
-
+            size_t count = 0;
+            auto leafPoints = std::vector<size_t>{};
+            auto [begin, end] = 0,0;
+            // Variantes según el tipo de octree
+            // Ptr expone un array de puntos
+            // Linear expone un rango de índices en el array global de puntos
+            if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                leafPoints = octree.getLeafPoints(leaf);
+                count = leafPoints.size();
+            }
+            else{
+                [begin, end] = octree.getLeafRange(leaf);
+                count = end - begin;
+            }
             if (count <= 1)
                 continue;
 
@@ -91,8 +100,12 @@ public:
 
             for (size_t i = 0; i < count; ++i)
             {
+                // Obtener índice global del punto (i) en la hoja (linear: directo -- ptr: a través de leafPoints)
+                
                 size_t idx = begin + i;
-
+                if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                    idx = leafPoints[i];
+                }
                 double dx, dy, dz;
                 if constexpr (std::is_same_v<Container, PointsSoA>) {
                     dx = points.dataX()[idx] - center.getX();
@@ -251,9 +264,20 @@ public:
         for (size_t leaf = 0; leaf < numLeaves; ++leaf)
         {
             const int tid = omp_get_thread_num();
-            auto [begin, end] = octree.getLeafRange(leaf);
-            const size_t count = end - begin;
-            const bool logLeaf = (leaf < 100 && count > 0); // loguear solo las primeras hojas con puntos para no saturar la salida
+            size_t count = 0;
+            std::vector<size_t> leafPoints;
+            size_t begin = 0;
+            size_t end = 0;
+
+            if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                leafPoints = octree.getLeafPoints(leaf);
+                count = leafPoints.size();
+            } else {
+                std::tie(begin, end) = octree.getLeafRange(leaf);
+                count = end - begin;
+            }
+
+            const bool logLeaf = (leaf < 20 && count > 0); // loguear solo las primeras hojas con puntos para no saturar la salida
 
             if (logLeaf) {
                 std::ostringstream oss;
@@ -282,7 +306,10 @@ public:
 
             for (size_t i = 0; i < count; ++i)
             {
-                const size_t idx = begin + i;
+                size_t idx = begin + i;
+                if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                    idx = leafPoints[i];
+                }
 
                 double dx, dy, dz;
                 if constexpr (std::is_same_v<Container, PointsSoA>) {
