@@ -62,7 +62,8 @@ public:
             int threadId = omp_get_thread_num();
             size_t count = 0;
             auto leafPoints = std::vector<size_t>{};
-            auto [begin, end] = 0,0;
+            size_t begin = 0;
+            size_t end = 0;
             // Variantes según el tipo de octree
             // Ptr expone un array de puntos
             // Linear expone un rango de índices en el array global de puntos
@@ -71,7 +72,9 @@ public:
                 count = leafPoints.size();
             }
             else{
-                [begin, end] = octree.getLeafRange(leaf);
+                auto range = octree.getLeafRange(leaf);
+                begin = range.first;
+                end   = range.second;
                 count = end - begin;
             }
             if (count <= 1)
@@ -273,7 +276,9 @@ public:
                 leafPoints = octree.getLeafPoints(leaf);
                 count = leafPoints.size();
             } else {
-                std::tie(begin, end) = octree.getLeafRange(leaf);
+                auto range = octree.getLeafRange(leaf);
+                begin = range.first;
+                end   = range.second;
                 count = end - begin;
             }
 
