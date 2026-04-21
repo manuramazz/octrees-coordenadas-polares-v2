@@ -73,7 +73,7 @@ class NeighborsBenchmark {
                 case omp_sched_static: openmpScheduleName = "static"; break;
                 case omp_sched_dynamic: openmpScheduleName = "dynamic"; break;
                 case omp_sched_guided: openmpScheduleName = "guided"; break;
-                default: openmpScheduleName; break;
+                default: openmpScheduleName = "unknown"; break;
             }
             std::string sequentialSearches;
             if(searchSet.sequential) {
@@ -130,7 +130,7 @@ class NeighborsBenchmark {
                 case omp_sched_static: openmpScheduleName = "static"; break;
                 case omp_sched_dynamic: openmpScheduleName = "dynamic"; break;
                 case omp_sched_guided: openmpScheduleName = "guided"; break;
-                default: openmpScheduleName; break;
+                default: openmpScheduleName = "unknown"; break;
             }
             std::string sequentialSearches;
             if(searchSet.sequential) {
@@ -179,15 +179,32 @@ class NeighborsBenchmark {
                 double testRadius = mainOptions.benchmarkRadii[r];
 
                 for (size_t leaf = 0; leaf < numLeavesToTest; ++leaf) {
-                    const auto [begin, end] = oct.getLeafRange(leaf);
-                    if (begin == end) continue;
+                    std::vector<size_t> leafPoints;
+                    size_t begin = 0;
+                    size_t end = 0;
+                    size_t count = 0;
+                    if constexpr (requires { oct.getLeafPoints(leaf); }) {
+                        leafPoints = oct.getLeafPoints(leaf);
+                        count = leafPoints.size();
+                    } else {
+                        const auto range = oct.getLeafRange(leaf);
+                        begin = range.first;
+                        end = range.second;
+                        count = end - begin;
+                    }
+                    if (count == 0) continue;
+
+                    size_t queryIdx = begin;
+                    if constexpr (requires { oct.getLeafPoints(leaf); }) {
+                        queryIdx = leafPoints[0];
+                    }
 
                     // Usamos el primer punto de la hoja como query de prueba
                     Point testQuery;
                     if constexpr (std::is_same_v<Container, PointsSoA>) {
-                        testQuery = Point(points.dataX()[begin], points.dataY()[begin], points.dataZ()[begin]);
+                        testQuery = Point(points.dataX()[queryIdx], points.dataY()[queryIdx], points.dataZ()[queryIdx]);
                     } else {
-                        testQuery = points[begin];
+                        testQuery = points[queryIdx];
                     }
 
                     PrunedRange range = bestRange(
@@ -201,7 +218,6 @@ class NeighborsBenchmark {
                         mode,
                         false);
 
-                    const size_t count = end - begin;
                     const double prunedPct = (count > 0)
                         ? 100.0 * (1.0 - static_cast<double>(range.count()) / count)
                         : 0.0;
@@ -513,7 +529,7 @@ class NeighborsBenchmark {
                 auto neighborsSearchPrune = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
-                    //#pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                    #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                         for(size_t i = 0; i<searchSet.numSearches; i++) {
                             auto result = oct.template neighborsPrune<kernel>(points[searchIndexes[i]], radius, getRange);
                             averageResultSize += result.size();
@@ -562,21 +578,32 @@ class NeighborsBenchmark {
         }
 
         template <Kernel_t kernel>
-        void benchmarkPtrOctree(Octree<Container> &oct, std::string_view kernelName) {
+        void benchmarkPtrOctree(Octree<Container> &oct, std::string_view kernelName, const OctreeReordered<Octree<Container>, Container>& reordered, ReorderMode mode) {
+            typename Octree<Container>::RangeFn getRange = nullptr;
+            const std::string_view reorderModeStr = localReorderTypeToString(mode);
+            if (mode != ReorderMode::None) {
+                getRange = [&](uint32_t leafIndex, const Point& query, double radius) {
+                    PrunedRange range = bestRange(leafIndex, query, radius, kernel,
+                                                oct, points, reordered, mode, false);
+                    const auto& perm = reordered.getLeafPermutation(leafIndex, range.order);
+                    return std::make_tuple(&perm, range.iMin, range.iMax);
+                };
+            }
+
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS_PTR)) {
                 auto neighborsPtrSearch = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
                     #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                         for(size_t i = 0; i<searchSet.numSearches; i++) {
-                            auto result = oct.template searchNeighbors<kernel>(points[searchIndexes[i]], radius);
+                            auto result = oct.template searchNeighbors<kernel>(points[searchIndexes[i]], radius, getRange);
                             averageResultSize += result.size();
                         }
                     averageResultSize /= searchSet.numSearches;
                     searchSet.nextRepeat();
                     return averageResultSize;
                 };
-                executeBenchmark(neighborsPtrSearch, kernelName, SearchAlgo::NEIGHBORS_PTR, "none");
+                executeBenchmark(neighborsPtrSearch, kernelName, SearchAlgo::NEIGHBORS_PTR, reorderModeStr);
             }
         }
 #ifdef HAVE_PICOTREE
@@ -731,8 +758,12 @@ class NeighborsBenchmark {
 
                     if (mode != ReorderMode::None) {
                         std::cout << "[LOG] Reordering mode " << (mode == ReorderMode::Cylindrical ? "Cylindrical" : "Spherical") << std::endl;
-                        
+                        // Measure time taken by reordering to include it in the logs
+                        auto startTime = std::chrono::high_resolution_clock::now();
                         reordered.buildLeafPermutations(oct, points, mode);
+                        auto endTime = std::chrono::high_resolution_clock::now();
+                        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+                        std::cout << "[LOG] Reordering completed in " << duration << " ms.\n";
 
                     } else {
                         std::cout << "[LOG] No reordering applied.\n";
@@ -766,21 +797,45 @@ class NeighborsBenchmark {
 
         void initializeBenchmarkPtrOctree() {
             Octree oct(points, box);
-            for (const auto& kernel : mainOptions.kernels) {
-                switch (kernel) {
-                    case Kernel_t::sphere:
-                        benchmarkPtrOctree<Kernel_t::sphere>(oct, kernelToString(kernel));
-                        break;
-                    case Kernel_t::circle:
-                        benchmarkPtrOctree<Kernel_t::circle>(oct, kernelToString(kernel));
-                        break;
-                    case Kernel_t::cube:
-                        benchmarkPtrOctree<Kernel_t::cube>(oct, kernelToString(kernel));
-                        break;
-                    case Kernel_t::square:
-                        benchmarkPtrOctree<Kernel_t::square>(oct, kernelToString(kernel));
-                        break;
+            std::cout << "[LOG] PtrOctree initialized. Num of leaves=" << oct.getNumLeaves() << "\n";
+
+            // Bucle sobre los modos de reordenación
+            for (ReorderMode mode : mainOptions.localReorders) {
+
+                //Declaración del objeto OctreeReordered a pasar por referencia
+                
+                OctreeReordered<std::decay_t<decltype(oct)>, Container> reordered;
+
+
+                if (mode != ReorderMode::None) {
+                    std::cout << "[LOG] Reordering mode " << (mode == ReorderMode::Cylindrical ? "Cylindrical" : "Spherical") << std::endl;
+                    // Measure time taken by reordering to include it in the logs
+                    auto startTime = std::chrono::high_resolution_clock::now();
+                    reordered.buildLeafPermutations(oct, points, mode);
+                    auto endTime = std::chrono::high_resolution_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+                    std::cout << "[LOG] OctreeReordered object initialized in " << duration << " ms.\n";
+                } else {
+                    std::cout << "[LOG] No reordering applied.\n";
                 }
+
+                for (const auto& kernel : mainOptions.kernels) {
+                    switch (kernel) {
+                        case Kernel_t::sphere:
+                            benchmarkPtrOctree<Kernel_t::sphere>(oct, kernelToString(kernel), reordered, mode);
+                            break;
+                        case Kernel_t::circle:
+                            benchmarkPtrOctree<Kernel_t::circle>(oct, kernelToString(kernel), reordered, mode);
+                            break;
+                        case Kernel_t::cube:
+                            benchmarkPtrOctree<Kernel_t::cube>(oct, kernelToString(kernel), reordered, mode);
+                            break;
+                        case Kernel_t::square:
+                            benchmarkPtrOctree<Kernel_t::square>(oct, kernelToString(kernel), reordered, mode);
+                            break;
+                    }
+                }
+                std::cout << "[LOG] Finished benchmarks for this reordering mode.\n";
             }
         }
 

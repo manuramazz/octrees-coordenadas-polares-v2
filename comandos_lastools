@@ -1,0 +1,1 @@
+~/lib/LASlib/bin/las2las64 -i data/*/*.laz -o data/*/*.las

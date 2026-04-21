@@ -381,8 +381,10 @@ void Octree<Container>::collectLeaves() {
         toVisit.pop_back();
 
         if (node->isLeaf()) {
-            if (!node->isEmpty())
+			if (!node->isEmpty()) {
+				node->leafIndex_ = leaves_.size();
                 leaves_.push_back(node);
+			}
         } else {
             for (const auto& child : node->getOctants()) {
 				toVisit.push_back(&child);

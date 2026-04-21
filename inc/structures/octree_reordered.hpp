@@ -32,7 +32,6 @@ public:
     precomputar (dx,dy) una sola vez por hoja
     no calcular acos para todos los puntos*/
 
-
     struct LeafPermutations {
         std::array<std::vector<size_t>, 3> perms;
     };
@@ -58,8 +57,6 @@ public:
         #pragma omp parallel for schedule(dynamic)
         for (size_t leaf = 0; leaf < numLeaves; ++leaf)
         {
-            // debug openMP (print numero de hilo y rango de la hoja)
-            int threadId = omp_get_thread_num();
             size_t count = 0;
             auto leafPoints = std::vector<size_t>{};
             size_t begin = 0;
@@ -77,8 +74,17 @@ public:
                 end   = range.second;
                 count = end - begin;
             }
-            if (count <= 1)
+            if (count == 0)
                 continue;
+            
+            if(count == 1) {
+                // Si solo hay un punto, las tres permutaciones son iguales (la única posición)
+                for (int k = 0; k < 3; ++k) {
+                    leafPerms[leaf].perms[k].resize(1);
+                    leafPerms[leaf].perms[k][0] = 0;
+                }
+                continue;
+            }
 
             const auto& center = octree.getLeafCenter(leaf);
 
@@ -201,7 +207,7 @@ public:
     // ==========================
 
     const std::vector<size_t>& getLeafPermutation(size_t leaf, OrderType type) const {
-        return leafPerms[leaf].perms[static_cast<int>(type)];
+         return leafPerms[leaf].perms[static_cast<int>(type)];
     }
 
     // ============================================================
@@ -436,4 +442,16 @@ public:
 
         debugLog("[OctreeReordered::Debug] finished");
     }
+
+        // Prints the (complete) range of points in a leaf, for debugging purposes
+    void logLeafRange(uint32_t leafIndex, size_t begin, size_t end) const {
+        std::cout << "Logging leaf range for leaf " << leafIndex << ": [" << begin << ", " << end << ")\n";
+        std::filesystem::path leafRangeLogPath = mainOptions.outputDirName / "leaf_range_log.log";
+        std::ofstream leafRangeLogFile(leafRangeLogPath, std::ios_base::app);
+        if (leafRangeLogFile.is_open()) {
+            leafRangeLogFile << "Leaf " << leafIndex << ": [" << begin << ", " << end << ")\n";
+            leafRangeLogFile.close();
+        }
+    }
+
 };

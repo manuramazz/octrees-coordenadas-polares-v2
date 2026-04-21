@@ -68,13 +68,30 @@ PrunedRange computeRange(
     const Container& points,
     const Reordered_t& reordered,
     ReorderMode mode,
-    bool logging = false)
+    bool logging = false,
+    const std::vector<size_t>* leafPointsPtr = nullptr)
 {
-    const auto [begin, end] = octree.getLeafRange(leaf);
-    const size_t count = end - begin;
+    (void)logging;
+    size_t begin = 0;
+    size_t end = 0;
+    size_t count = 0;
+
+    if constexpr (requires { octree.getLeafPoints(leaf); }) {
+        const auto& localLeafPoints = octree.getLeafPoints(leaf);
+        if (leafPointsPtr == nullptr) {
+            leafPointsPtr = &localLeafPoints;
+        }
+        count = leafPointsPtr->size();
+    } else {
+        const auto range = octree.getLeafRange(leaf);
+        begin = range.first;
+        end = range.second;
+        count = end - begin;
+    }
+
     PrunedRange full{0, count, order};
 
-    if (count == 0 || mode == ReorderMode::None)
+    if (count <= 1 || mode == ReorderMode::None)
         return full;
 
     const Point& center = octree.getLeafCenter(leaf);
@@ -90,7 +107,11 @@ PrunedRange computeRange(
     // Calcula la clave del i-ésimo punto en el orden de la permutación
     const auto& perm = reordered.getLeafPermutation(leaf, order);
     auto keyAt = [&](size_t permIdx) -> double {
-        const size_t globalIdx = begin + perm[permIdx];
+        size_t globalIdx = begin + perm[permIdx];
+        if constexpr (requires { octree.getLeafPoints(leaf); }) {
+            assert(leafPointsPtr != nullptr);
+            globalIdx = (*leafPointsPtr)[perm[permIdx]];
+        }
         double px, py, pz;
         if constexpr (std::is_same_v<Container, PointsSoA>) {
             px = points.dataX()[globalIdx] - center.getX();
@@ -173,27 +194,37 @@ PrunedRange bestRange(
     ReorderMode mode,
     bool logging = false)
 {
-    const auto [begin, end] = octree.getLeafRange(leaf);
-    PrunedRange best{0, end - begin, OrderType::K0};
+    auto computeBestForLeaf = [&](size_t count, const std::vector<size_t>* leafPointsPtr) {
+        PrunedRange best{0, count, OrderType::K0};
 
-    for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
-        PrunedRange r = computeRange(
-            leaf, query, radius, kernel, order,
-            octree, points, reordered, mode, logging);
-        if (r.count() < best.count())
-            best = r;
-        if (logging) {
-            std::ostringstream oss;
-            oss << "Leaf " << leaf << " order=" << static_cast<int>(order)
-                 << " range=[" << r.iMin << "," << r.iMax << ") count=" << r.count();
-            std::cout << oss.str() << '\n';
+        for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
+            PrunedRange r = computeRange(
+                leaf, query, radius, kernel, order,
+                octree, points, reordered, mode, logging, leafPointsPtr);
+            if (r.count() < best.count()) {
+                best = r;
+            }
+            if (logging) {
+                std::ostringstream oss;
+                oss << "Leaf " << leaf << " order=" << static_cast<int>(order)
+                    << " range=[" << r.iMin << "," << r.iMax << ") count=" << r.count();
+                std::cout << oss.str() << '\n';
+            }
         }
 
-    }
-    if (logging) {
-        std::cout << "Leaf " << leaf << ": best order=" << static_cast<int>(best.order)
-                  << " count=" << best.count() << " / " << (end - begin) << '\n';
-    }
+        if (logging) {
+            std::cout << "Leaf " << leaf << ": best order=" << static_cast<int>(best.order)
+                    << " count=" << best.count() << " / " << count << '\n';
+        }
 
-    return best;
+        return best;
+    };
+
+    if constexpr (requires { octree.getLeafPoints(leaf); }) {
+        const auto& leafPoints = octree.getLeafPoints(leaf);
+        return computeBestForLeaf(leafPoints.size(), &leafPoints);
+    } else {
+        const auto [begin, end] = octree.getLeafRange(leaf);
+        return computeBestForLeaf(end - begin, nullptr);
+    }
 }

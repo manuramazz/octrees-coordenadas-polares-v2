@@ -827,6 +827,17 @@ public:
         return result;
 	}
 
+    /*
+    * @brief Auxiliar func to log selected ranges during searches with getRange
+    */
+    void logLeafRange(uint32_t leafIndex, size_t iMin, size_t iMax) const {
+        std::cout << "Logging leaf range for leaf " << leafIndex << ": [" << iMin << ", " << iMax << ")\n";
+        std::filesystem::path leafRangeLogPath = mainOptions.outputDirName / "leaf_range_log.log";
+        std::ofstream leafRangeLogFile(leafRangeLogPath, std::ios_base::app);
+        if (leafRangeLogFile.is_open()) {
+            leafRangeLogFile << "Leaf " << leafIndex << ": [" << iMin << ", " << iMax << ")\n";
+        }
+    }
 
     /**
      * @brief Search neighbors function. Given kernel that already contains a point and a radius, return the points inside the region.
@@ -875,7 +886,6 @@ public:
             size_t endIndex = this->internalRanges[nodeIndex].second;
             assert(startIndex <= endIndex && "invalid range in internalRanges");
             assert(endIndex <= points.size() && "internalRanges points end out of bounds");
-            
             // If getRange provided -> uses polar coords optimization
             // Only checks points inside range returned by bestRange (from octree_range_selector)
             if (getRange) {
@@ -887,6 +897,7 @@ public:
                     if (perm != nullptr) {
                         assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
                         assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
+                        //log de perm;
                         for (size_t i = iMin; i < iMax; ++i) {
                             const size_t pointIndex = startIndex + (*perm)[i];
                             assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
@@ -906,7 +917,6 @@ public:
                 }
             }
         };
-        
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
         return ptsInside;
 	}

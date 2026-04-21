@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <functional>
 #include <queue>
 #include <vector>
 #include <optional>
@@ -30,10 +31,13 @@ class Octree
 	std::vector<Octree>   octants_{};
 	Point                 center_{};
 	std::vector<size_t> points_{};
+	mutable size_t        leafIndex_{0};
 	Vector   radii_{};
 
 	public:
 	Octree() = delete;
+
+	using RangeFn = std::function<std::tuple<const std::vector<size_t>*, size_t, size_t>(uint32_t, const Point&, double)>;
 
 	// root constructors
 	explicit Octree(Container& container, Box box);
@@ -85,6 +89,7 @@ class Octree
 
 	[[nodiscard]] inline auto& getCenter() const { return center_; }
 	[[nodiscard]] inline auto  getRadii() const { return radii_; }
+	[[nodiscard]] inline size_t getLeafIndex() const { return leafIndex_; }
 
 	template<Kernel_t kernel_type = Kernel_t::square>
 	[[nodiscard]] inline std::vector<size_t> searchNeighbors(const Point& p, double radius) const
@@ -100,7 +105,7 @@ class Octree
 		// The compiler should optimize this away
 		constexpr auto dummyCondition = [](const Point&) { return true; };
 
-		return neighbors(kernel, dummyCondition);
+		return neighbors(kernel, dummyCondition, nullptr);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
@@ -117,10 +122,11 @@ class Octree
 		// The compiler should optimize this away
 		constexpr auto dummyCondition = [](const Point&) { return true; };
 
-		return neighbors(kernel, dummyCondition);
+		return neighbors(kernel, dummyCondition, nullptr);
 	}
 
-	template<Kernel_t kernel_type = Kernel_t::square, class Function>
+	template<Kernel_t kernel_type = Kernel_t::square, class Function,
+	         typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
 	[[nodiscard]] inline std::vector<size_t> searchNeighbors(const Point& p, double radius, Function&& condition) const
 	/**
    * @brief Search neighbors function. Given a point and a radius, return the points inside a given kernel type
@@ -132,10 +138,11 @@ class Octree
    */
 	{
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-		return neighbors(kernel, std::forward<Function&&>(condition));
+		return neighbors(kernel, std::forward<Function>(condition), nullptr);
 	}
 
-	template<Kernel_t kernel_type = Kernel_t::square, class Function>
+	template<Kernel_t kernel_type = Kernel_t::square, class Function,
+	         typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
 	[[nodiscard]] inline std::vector<size_t> searchNeighbors(const Point& p, const Vector& radii,
 	                                                          Function&& condition) const
 	/**
@@ -148,13 +155,33 @@ class Octree
    */
 	{
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-		return neighbors(kernel, std::forward<Function&&>(condition));
+		return neighbors(kernel, std::forward<Function>(condition), nullptr);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::square>
+	[[nodiscard]] inline std::vector<size_t> searchNeighbors(const Point& p, double radius,
+	                                                         const RangeFn& getRange) const
+	{
+		const auto kernel = kernelFactory<kernel_type>(p, radius);
+		constexpr auto dummyCondition = [](const Point&) { return true; };
+		return neighbors(kernel, dummyCondition, getRange);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::square>
+	[[nodiscard]] inline std::vector<size_t> searchNeighbors(const Point& p, const Vector& radii,
+	                                                         const RangeFn& getRange) const
+	{
+		const auto kernel = kernelFactory<kernel_type>(p, radii);
+		constexpr auto dummyCondition = [](const Point&) { return true; };
+		return neighbors(kernel, dummyCondition, getRange);
 	}
 
 	[[nodiscard]] std::vector<size_t> KNN(const Point& p, size_t k, size_t maxNeighs = DEFAULT_KNN) const;
 
-	template<typename Kernel, typename Function>
-	[[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, Function&& condition) const
+	template<typename Kernel, typename Function,
+	         typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
+	[[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, Function&& condition,
+	                                            const RangeFn& getRange = nullptr) const
 	/**
    * @brief Search neighbors function. Given kernel that already contains a point and a radius, return the points inside the region.
    * @param k specific kernel that contains the data of the region (center and radius)
@@ -174,12 +201,32 @@ class Octree
 			toVisit.pop_back();
 			if (octree.isLeaf())
 			{
-				for (size_t globalIdx : octree.getPoints()) {
-					const auto& point = octree.container_[globalIdx];
-					if (k.isInside(point) && condition(point)) {
-						ptsInside.emplace_back(globalIdx);
+				if (getRange) {
+					assert(!octree.points_.empty() && "Leaf node with no points in neighbors function");
+					const auto searchRadius = k.radii().getX();
+					const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(octree.getLeafIndex()), k.center(), searchRadius);
+					if (perm != nullptr) {
+						assert(iMin <= iMax && "bestRange returned iMin > iMax");
+						assert(iMax <= perm->size() && "bestRange returned iMax out of range");
+						const auto& leafPoints = octree.getPoints();
+						for (size_t i = iMin; i < iMax; ++i) {
+							const size_t globalIdx = leafPoints[(*perm)[i]];
+							const auto& point = octree.container_[globalIdx];
+							if (k.isInside(point) && condition(point)) {
+								ptsInside.emplace_back(globalIdx);
+							}
+						}
+						continue;
 					}
 				}
+
+					for (size_t globalIdx : octree.getPoints()) {
+						const auto& point = octree.container_[globalIdx];
+						if (k.isInside(point) && condition(point)) {
+							ptsInside.emplace_back(globalIdx);
+						}
+					}
+				
 			}
 			else
 			{
@@ -188,6 +235,37 @@ class Octree
 			}
 		}
 		return ptsInside;
+	}
+/*
+            // If getRange provided -> uses polar coords optimization
+            // Only checks points inside range returned by bestRange (from octree_range_selector)
+            if (getRange) {
+                assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
+                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+                if (leafIndex >= 0) {
+                    assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
+                    const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    if (perm != nullptr) {
+                        assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
+                        assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
+                        //log de perm;
+                        for (size_t i = iMin; i < iMax; ++i) {
+                            const size_t pointIndex = startIndex + (*perm)[i];
+                            assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
+                            assert(pointIndex < points.size() && "pointIndex out of points bounds in neighborsPrune");
+                            if (k.isInside(points[pointIndex])) {
+                                ptsInside.push_back(pointIndex);
+                            }
+                        }
+                        return;
+                    }
+                }
+            }*/
+	template<typename Kernel>
+	[[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, const RangeFn& getRange = nullptr) const
+	{
+		constexpr auto dummyCondition = [](const Point&) { return true; };
+		return neighbors(k, dummyCondition, getRange);
 	}
 
 	[[nodiscard]] inline std::vector<size_t> searchNeighbors2D(const Point& p, const double radius) const
