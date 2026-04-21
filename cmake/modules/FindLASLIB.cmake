@@ -9,7 +9,7 @@
 find_path(LASLIB_INCLUDE_DIR
     NAMES lasreader.hpp
     PATHS ${CMAKE_SOURCE_DIR}/../../lib/LASlib/include/LASlib ${CMAKE_PREFIX_PATH}
-    PATH_SUFFIXES include
+    PATH_SUFFIXES include 
     DOC "Path to LASlib include directory"
 )
 

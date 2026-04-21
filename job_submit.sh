@@ -13,14 +13,7 @@
 #SBATCH --mail-user=manuel.ramallo@rai.usc.es
 
 module purge
-module load gcc/11.2.0
-module load cmake/3.21.1
-module load numactl
-module load zlib
-module load libpng
-module load libtiff
-module load proj
-module load zstd
+module load papi
 
 chmod +x compile.sh
 chmod +x bench_neighbors_reorders.bash
