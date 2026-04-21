@@ -1,0 +1,1 @@
+./build/octrees-benchmark --kernels "sphere" -i "data/paris_lille/Lille_0.las" -o "out_prueba" -r "3.0" -s "5000" --sequential --repeats 1 --no-warmup -a "neighbors" -e "hilb" --local-reorder "none,spherical,cylindrical" -c "AoS"

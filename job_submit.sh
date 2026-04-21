@@ -16,6 +16,11 @@ module purge
 module load gcc/11.2.0
 module load cmake/3.21.1
 module load numactl
+module load zlib
+module load libpng
+module load libtiff
+module load proj
+module load zstd
 
 chmod +x compile.sh
 chmod +x bench_neighbors_reorders.bash
@@ -27,3 +32,4 @@ bash compile.sh
 bash bench_neighbors_reorders.bash
 
 echo "Benchmark finalizado: $(date)"
+echo "l"
