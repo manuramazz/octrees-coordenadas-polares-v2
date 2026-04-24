@@ -194,6 +194,8 @@ class Octree
 		std::vector<std::reference_wrapper<const Octree>> toVisit;
 		toVisit.reserve(OCTANTS_PER_NODE); // There is usually less than 8 octants to visit
 		toVisit.emplace_back(*this);
+		const auto& query = k.center();
+		//std::cout << "Query: " << query.getX() << query.getY() <<query.getZ() <<"\n" << std::endl;
 
 		while (!toVisit.empty())
 		{
@@ -201,8 +203,7 @@ class Octree
 			toVisit.pop_back();
 			if (octree.isLeaf())
 			{
-				if (getRange) {
-					assert(!octree.points_.empty() && "Leaf node with no points in neighbors function");
+				if (getRange && octree.getNumPoints() > 0) {
 					const auto searchRadius = k.radii().getX();
 					const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(octree.getLeafIndex()), k.center(), searchRadius);
 					if (perm != nullptr) {
@@ -213,6 +214,7 @@ class Octree
 							const size_t globalIdx = leafPoints[(*perm)[i]];
 							const auto& point = octree.container_[globalIdx];
 							if (k.isInside(point) && condition(point)) {
+								//std::cout << globalIdx << " " << point.getX() << " " << point.getY() << " " << point.getZ() << "\n" << std::endl;
 								ptsInside.emplace_back(globalIdx);
 							}
 						}
@@ -223,6 +225,7 @@ class Octree
 					for (size_t globalIdx : octree.getPoints()) {
 						const auto& point = octree.container_[globalIdx];
 						if (k.isInside(point) && condition(point)) {
+							//std::cout << globalIdx << " " << point.getX() << " " << point.getY() << " " << point.getZ() << "\n" << std::endl;
 							ptsInside.emplace_back(globalIdx);
 						}
 					}
@@ -236,31 +239,7 @@ class Octree
 		}
 		return ptsInside;
 	}
-/*
-            // If getRange provided -> uses polar coords optimization
-            // Only checks points inside range returned by bestRange (from octree_range_selector)
-            if (getRange) {
-                assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
-                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-                if (leafIndex >= 0) {
-                    assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
-                    const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
-                    if (perm != nullptr) {
-                        assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
-                        assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
-                        //log de perm;
-                        for (size_t i = iMin; i < iMax; ++i) {
-                            const size_t pointIndex = startIndex + (*perm)[i];
-                            assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
-                            assert(pointIndex < points.size() && "pointIndex out of points bounds in neighborsPrune");
-                            if (k.isInside(points[pointIndex])) {
-                                ptsInside.push_back(pointIndex);
-                            }
-                        }
-                        return;
-                    }
-                }
-            }*/
+
 	template<typename Kernel>
 	[[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, const RangeFn& getRange = nullptr) const
 	{
@@ -424,7 +403,7 @@ class Octree
 	[[nodiscard]] std::vector<size_t> searchNeighborsRing(const Point& p, const Vector& innerRingRadii,
 	                                                       const Vector& outerRingRadii) const
 	/**
-	 * A point is considered to be inside a Ring around a point if its outside the innerRing and inside the outerRing
+	 * A point is considered to be inside a Ring around a point if it's outside the innerRing and inside the outerRing
 	 * @param p Center of the kernel to be used
 	 * @param innerRingRadii Radii of the inner part of the ring. Points within this part will be excluded
 	 * @param outerRingRadii Radii of the outer part of the ring

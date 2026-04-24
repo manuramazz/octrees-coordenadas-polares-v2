@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <fstream>
 #include <vector>
 
 #include "../geometry/point.hpp"
@@ -14,15 +15,32 @@ namespace detail {
 inline constexpr double kPi    = 3.14159265358979323846;
 inline constexpr double kTwoPi = 2.0 * kPi;
 
+inline std::ofstream g_octreeRangeSelectorLogFile("logs/funcv1Lille.log", std::ios::app);
+
+
+//función que imprime los el log en un archivo
+inline void printLog(const std::string& message) {
+    if (g_octreeRangeSelectorLogFile.is_open()) {
+        g_octreeRangeSelectorLogFile << message << '\n';
+    }
+}
+
 inline double normalizeAngle0To2Pi(double a) {
     double out = std::fmod(a, kTwoPi);
     return out < 0.0 ? out + kTwoPi : out;
 }
 
-inline double effectiveRadius(double radius, Kernel_t kernel) {
-    return (kernel == Kernel_t::cube || kernel == Kernel_t::square)
-        ? radius * std::sqrt(3.0)
-        : radius;
+inline double effectiveRadius(double const radius, Kernel_t const kernel) {
+    if (kernel == Kernel_t::cube) {
+        return radius * std::sqrt(3.0);
+    }if (kernel == Kernel_t::sphere) {
+        return radius;
+    }if (kernel == Kernel_t::square) {
+        return radius * std::sqrt(3.0);
+    }if (kernel == Kernel_t::circle) {
+        return radius;
+    }
+    return radius;
 }
 
 // Devuelve la clave de un punto (índice local i en la hoja) para un orden dado.
@@ -101,6 +119,8 @@ PrunedRange computeRange(
     const double dxy = std::sqrt(dx * dx + dy * dy);
     const double d   = std::sqrt(dxy * dxy + dz * dz);
     const double rEff = detail::effectiveRadius(radius, kernel);
+    const double rxyEff = (kernel == Kernel_t::cube || kernel == Kernel_t::square)
+    ? radius * std::sqrt(2.0) : radius;
 
     constexpr double eps = 1e-12;
 
@@ -148,7 +168,7 @@ PrunedRange computeRange(
         if (mode == ReorderMode::Spherical) {
             return {lowerIdx(std::max(0.0, d - rEff)), upperIdx(d + rEff), order};
         }
-        return {lowerIdx(dz - rEff), upperIdx(dz + rEff), order};
+        return {lowerIdx(dz - radius), upperIdx(dz + radius), order};
     }
 
     if (order == OrderType::K1) {
@@ -160,13 +180,14 @@ PrunedRange computeRange(
             return {lowerIdx(std::max(0.0, thetaQ - deltaTheta)),
                     upperIdx(std::min(detail::kPi, thetaQ + deltaTheta)), order};
         }
-        return {lowerIdx(std::max(0.0, dxy - rEff)), upperIdx(dxy + rEff), order};
+        return {lowerIdx(std::max(0.0, dxy - rxyEff)), upperIdx(dxy + rxyEff), order};
     }
 
     // K0 azimutal
     if (dxy <= eps) return full;
+    if (dxy < rxyEff) return full;
     const double phiQ     = detail::normalizeAngle0To2Pi(std::atan2(dy, dx));
-    const double deltaPhi = std::asin(std::clamp(rEff / dxy, 0.0, 1.0));
+    const double deltaPhi = std::asin(std::clamp(rxyEff / dxy, 0.0, 1.0));
     if (deltaPhi >= detail::kPi) return full;
 
     const double kMinRaw = phiQ - deltaPhi;
@@ -196,6 +217,8 @@ PrunedRange bestRange(
 {
     auto computeBestForLeaf = [&](size_t count, const std::vector<size_t>* leafPointsPtr) {
         PrunedRange best{0, count, OrderType::K0};
+        //const Point& centro = octree.getLeafCenter(leaf);
+        //std::cout << "Leaf " << leaf << ": Center =" << centro.getX() << " " << centro.getY() << " " << centro.getZ() << "\n" << std::endl;
 
         for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
             PrunedRange r = computeRange(
@@ -204,12 +227,13 @@ PrunedRange bestRange(
             if (r.count() < best.count()) {
                 best = r;
             }
-            if (logging) {
+            detail::printLog(std::to_string(leaf) + "," + std::string(kernelToString(kernel)) + "," + std::string(localReorderTypeToString(mode)) + "," + std::to_string(radius) + "," + std::to_string(r.count()) + "," + std::to_string(count) + "," + std::to_string(static_cast<int>(order)));
+            /*if (logging) {
                 std::ostringstream oss;
                 oss << "Leaf " << leaf << " order=" << static_cast<int>(order)
                     << " range=[" << r.iMin << "," << r.iMax << ") count=" << r.count();
                 std::cout << oss.str() << '\n';
-            }
+            }*/
         }
 
         if (logging) {

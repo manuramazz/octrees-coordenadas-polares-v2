@@ -1,0 +1,35 @@
+# - Find LASlib
+
+# Intentamos buscar usando el PATH estándar y lo que pasemos por CMAKE_PREFIX_PATH
+find_path(LASLIB_INCLUDE_DIR
+    NAMES lasreader.hpp
+    PATH_SUFFIXES include include/LASlib
+    DOC "Path to LASlib include directory"
+)
+
+find_library(LASLIB_LIBRARY
+    NAMES LASlib laslib
+    PATHS ${CMAKE_PREFIX_PATH}
+    PATH_SUFFIXES lib lib64 lib/LASlib
+    DOC "Path to LASlib library"
+)
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(LASLIB
+    REQUIRED_VARS LASLIB_LIBRARY LASLIB_INCLUDE_DIR
+)
+
+if(LASLIB_FOUND)
+    set(LASLIB_LIBRARIES ${LASLIB_LIBRARY})
+    set(LASLIB_INCLUDE_DIRS ${LASLIB_INCLUDE_DIR})
+
+    if(NOT TARGET LASLIB::LASLIB)
+        add_library(LASLIB::LASLIB UNKNOWN IMPORTED)
+        set_target_properties(LASLIB::LASLIB PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${LASLIB_INCLUDE_DIRS}"
+            IMPORTED_LOCATION "${LASLIB_LIBRARIES}"
+        )
+    endif()
+endif()
+
+mark_as_advanced(LASLIB_INCLUDE_DIR LASLIB_LIBRARY)

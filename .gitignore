@@ -6,8 +6,8 @@ data
 heaptrack
 lib
 old
-out
-out_tfg_v3/
+out*
+logs
 plots/__pycache__
 cmake-build-debug
 cmake-build-release
