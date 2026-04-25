@@ -11,3 +11,4 @@ logs
 plots/__pycache__
 cmake-build-debug
 cmake-build-release
+results*
