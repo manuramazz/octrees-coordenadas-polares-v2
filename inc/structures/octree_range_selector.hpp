@@ -2,253 +2,165 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
+#include <ctime>
 #include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include "../geometry/point.hpp"
 #include "../main_options.hpp"
 #include "octree_types.hpp"
 
-namespace detail {
-
-inline constexpr double kPi    = 3.14159265358979323846;
-inline constexpr double kTwoPi = 2.0 * kPi;
-
-inline std::ofstream g_octreeRangeSelectorLogFile("logs/funcv1Lille.log", std::ios::app);
-
-
-//función que imprime los el log en un archivo
-inline void printLog(const std::string& message) {
-    if (g_octreeRangeSelectorLogFile.is_open()) {
-        g_octreeRangeSelectorLogFile << message << '\n';
-    }
-}
-
-inline double normalizeAngle0To2Pi(double a) {
-    double out = std::fmod(a, kTwoPi);
-    return out < 0.0 ? out + kTwoPi : out;
-}
-
-inline double effectiveRadius(double const radius, Kernel_t const kernel) {
-    if (kernel == Kernel_t::cube) {
-        return radius * std::sqrt(3.0);
-    }if (kernel == Kernel_t::sphere) {
-        return radius;
-    }if (kernel == Kernel_t::square) {
-        return radius * std::sqrt(3.0);
-    }if (kernel == Kernel_t::circle) {
-        return radius;
-    }
-    return radius;
-}
-
-// Devuelve la clave de un punto (índice local i en la hoja) para un orden dado.
-// Recibe las coordenadas relativas al centro de la hoja ya calculadas.
-inline double computePointKey(
-    double dx, double dy, double dz,
-    double rxy,
-    OrderType order,
-    ReorderMode mode)
-{
-    if (order == OrderType::K0) {
-        return normalizeAngle0To2Pi(std::atan2(dy, dx));
-    }
-    if (order == OrderType::K1) {
-        if (mode == ReorderMode::Spherical) {
-            const double r = std::sqrt(rxy * rxy + dz * dz);
-            return (r > 0.0) ? std::acos(std::clamp(dz / r, -1.0, 1.0)) : 0.0;
-        }
-        return rxy; // cilíndrico
-    }
-    // K2
-    if (mode == ReorderMode::Spherical)
-        return std::sqrt(rxy * rxy + dz * dz);
-    return dz; // cilíndrico
-}
-
-} // namespace detail
-
 // ---------------------------------------------------------------
 
+inline std::ofstream& getRangeSelectorLog() {
+    static std::ofstream logFile = []() {
+        const std::string baseName =
+            mainOptions.inputFileName.empty() ? "input" : mainOptions.inputFileName;
 
+        const auto now = std::chrono::system_clock::now();
+        const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+        std::tm tmSnapshot{};
+#ifdef _WIN32
+        localtime_s(&tmSnapshot, &nowTime);
+#else
+        localtime_r(&nowTime, &tmSnapshot);
+#endif
+
+        std::ostringstream stamp;
+        stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
+
+        fs::path logDir{"logs"};
+        std::error_code ec;
+        fs::create_directories(logDir, ec);
+
+        const fs::path logPath = logDir / (baseName + "_" + stamp.str() + ".log");
+        return std::ofstream(logPath, std::ios::app);
+    }();
+    
+    return logFile;
+}
+
+inline void printLog(const std::string& message) {
+    auto& f = getRangeSelectorLog();
+    if (f.is_open())
+        f << message << '\n';
+}
 
 // Calcula el rango [iMin, iMax) sobre la permutación de `order` para una hoja.
-// No requiere caché: recalcula las claves de cada punto cuando hace lower/upper_bound.
-template<typename Octree_t, typename Container, typename Reordered_t>
+
+// Deprecated: No requiere caché: recalcula las claves de cada punto cuando hace lower/upper_bound.
+//VERSIÓN NUEVA: la reordenación guarda caché de claves, en la búsqueda solo se leen los vectores de memoria
+template<typename Octree_t, typename Reordered_t>
 PrunedRange computeRange(
     size_t leaf,
-    const Point& query,
-    double radius,
     Kernel_t kernel,
     OrderType order,
     const Octree_t& octree,
-    const Container& points,
+    const size_t count,
     const Reordered_t& reordered,
     ReorderMode mode,
-    bool logging = false,
-    const std::vector<size_t>* leafPointsPtr = nullptr)
+    const detail::LeafQueryGeometry& geo )
 {
-    (void)logging;
-    size_t begin = 0;
-    size_t end = 0;
-    size_t count = 0;
-
-    if constexpr (requires { octree.getLeafPoints(leaf); }) {
-        const auto& localLeafPoints = octree.getLeafPoints(leaf);
-        if (leafPointsPtr == nullptr) {
-            leafPointsPtr = &localLeafPoints;
-        }
-        count = leafPointsPtr->size();
-    } else {
-        const auto range = octree.getLeafRange(leaf);
-        begin = range.first;
-        end = range.second;
-        count = end - begin;
-    }
-
-    PrunedRange full{0, count, order};
+    
+    PrunedRange full{0, count, 0,0,false, order};
 
     if (count <= 1 || mode == ReorderMode::None)
         return full;
-
-    const Point& center = octree.getLeafCenter(leaf);
-    const double dx  = query.getX() - center.getX();
-    const double dy  = query.getY() - center.getY();
-    const double dz  = query.getZ() - center.getZ();
-    const double dxy = std::sqrt(dx * dx + dy * dy);
-    const double d   = std::sqrt(dxy * dxy + dz * dz);
-    const double rEff = detail::effectiveRadius(radius, kernel);
-    const double rxyEff = (kernel == Kernel_t::cube || kernel == Kernel_t::square)
-    ? radius * std::sqrt(2.0) : radius;
-
     constexpr double eps = 1e-12;
 
-    // Calcula la clave del i-ésimo punto en el orden de la permutación
-    const auto& perm = reordered.getLeafPermutation(leaf, order);
-    auto keyAt = [&](size_t permIdx) -> double {
-        size_t globalIdx = begin + perm[permIdx];
-        if constexpr (requires { octree.getLeafPoints(leaf); }) {
-            assert(leafPointsPtr != nullptr);
-            globalIdx = (*leafPointsPtr)[perm[permIdx]];
-        }
-        double px, py, pz;
-        if constexpr (std::is_same_v<Container, PointsSoA>) {
-            px = points.dataX()[globalIdx] - center.getX();
-            py = points.dataY()[globalIdx] - center.getY();
-            pz = points.dataZ()[globalIdx] - center.getZ();
-        } else {
-            px = points[globalIdx].getX() - center.getX();
-            py = points[globalIdx].getY() - center.getY();
-            pz = points[globalIdx].getZ() - center.getZ();
-        }
-        const double prxy = std::sqrt(px * px + py * py);
-        return detail::computePointKey(px, py, pz, prxy, order, mode);
-    };
+    const auto& keys = reordered.getLeafKeys(leaf, order);
 
-    // lower/upper bound sobre la permutación usando keyAt
+    // lowerIdx: primer índice donde keys[mid] >= val
     auto lowerIdx = [&](double val) -> size_t {
-        size_t lo = 0, hi = count;
-        while (lo < hi) {
-            size_t mid = lo + (hi - lo) / 2;
-            if (keyAt(mid) < val) lo = mid + 1; else hi = mid;
-        }
-        return lo;
-    };
-    auto upperIdx = [&](double val) -> size_t {
-        size_t lo = 0, hi = count;
-        while (lo < hi) {
-            size_t mid = lo + (hi - lo) / 2;
-            if (keyAt(mid) <= val) lo = mid + 1; else hi = mid;
-        }
-        return lo;
+        return static_cast<size_t>(
+            std::lower_bound(keys.begin(), keys.end(), val) - keys.begin());
     };
 
+    // upperIdx: primer índice donde keys[mid] > val
+    auto upperIdx = [&](double val) -> size_t {
+        return static_cast<size_t>(
+            std::upper_bound(keys.begin(), keys.end(), val) - keys.begin());
+    };
+
+
+    // Rangos según clave y kernel
     if (order == OrderType::K2) {
         if (mode == ReorderMode::Spherical) {
-            return {lowerIdx(std::max(0.0, d - rEff)), upperIdx(d + rEff), order};
+            return {lowerIdx(std::max(0.0, geo.d - geo.rEff)), upperIdx(geo.d + geo.rEff),0,0,false, order};
         }
-        return {lowerIdx(dz - radius), upperIdx(dz + radius), order};
+        
+        return {lowerIdx(geo.dz - geo.radius), upperIdx(geo.dz + geo.radius),0,0,false, order};
     }
 
     if (order == OrderType::K1) {
         if (mode == ReorderMode::Spherical) {
-            if (d <= eps) return full;
-            if (rEff >= d) return full;
-            const double thetaQ    = std::acos(std::clamp(dz / d, -1.0, 1.0));
-            const double deltaTheta = std::asin(std::clamp(rEff / d, 0.0, 1.0));
+            if (geo.d <= eps) return full;
+            if (geo.rEff >= geo.d) return full;
+            const double thetaQ    = std::acos(std::clamp(geo.dz / geo.d, -1.0, 1.0));
+            const double deltaTheta = std::asin(std::clamp(geo.rxyEff / geo.d, 0.0, 1.0));
             return {lowerIdx(std::max(0.0, thetaQ - deltaTheta)),
-                    upperIdx(std::min(detail::kPi, thetaQ + deltaTheta)), order};
+                    upperIdx(std::min(detail::kPi, thetaQ + deltaTheta)),0,0,false, order};
         }
-        return {lowerIdx(std::max(0.0, dxy - rxyEff)), upperIdx(dxy + rxyEff), order};
+        return {lowerIdx(std::max(0.0, geo.dxy - geo.rxyEff)), upperIdx(geo.dxy + geo.rxyEff),0,0,false, order};
     }
 
     // K0 azimutal
-    if (dxy <= eps) return full;
-    if (dxy < rxyEff) return full;
-    const double phiQ     = detail::normalizeAngle0To2Pi(std::atan2(dy, dx));
-    const double deltaPhi = std::asin(std::clamp(rxyEff / dxy, 0.0, 1.0));
+    if (geo.dxy <= eps) return full;
+    if (geo.dxy < geo.rxyEff) return full;
+    const double phiQ     = detail::normalizeAngle0To2Pi(std::atan2(geo.dy, geo.dx));
+    const double deltaPhi = std::asin(std::clamp(geo.rxyEff / geo.dxy, 0.0, 1.0));
     if (deltaPhi >= detail::kPi) return full;
 
     const double kMinRaw = phiQ - deltaPhi;
     const double kMaxRaw = phiQ + deltaPhi;
 
-    if (kMinRaw < 0.0 || kMaxRaw >= detail::kTwoPi)
-        return full;                                  // el rango cubre todo el círculo 
-    /*if (kMinRaw < 0.0)
-        return {0, upperIdx(kMaxRaw), order};          // aprovecha la mitad alta
-    if (kMaxRaw >= detail::kTwoPi)
-        return {lowerIdx(kMinRaw), count, order};      // aprovecha la mitad baja
-    */
-    return {lowerIdx(kMinRaw), upperIdx(kMaxRaw), order};
+    if (kMinRaw < 0.0) {
+        // Wrap por la izquierda: [0, kMaxRaw] ∪ [kMinRaw+2π, 2π)
+        const size_t iMax1 = upperIdx(kMaxRaw);
+        const size_t iMin2 = lowerIdx(kMinRaw + detail::kTwoPi);
+        return {0, iMax1, iMin2, count, true, order};
+    }
+    if (kMaxRaw >= detail::kTwoPi) {
+        // Wrap por la derecha: [0, kMaxRaw-2π] ∪ [kMinRaw, 2π)
+        const size_t iMax1 = upperIdx(kMaxRaw - detail::kTwoPi);
+        const size_t iMin2 = lowerIdx(kMinRaw);
+        return {0, iMax1, iMin2, count, true, order};
+    }
+
+    return {lowerIdx(kMinRaw), upperIdx(kMaxRaw), 0, 0, false, order};
 }
 
-template<typename Octree_t, typename Container, typename Reordered_t>
+template<typename Octree_t, typename Reordered_t>
 PrunedRange bestRange(
     size_t leaf,
     const Point& query,
     double radius,
     Kernel_t kernel,
     const Octree_t& octree,
-    const Container& points,
     const Reordered_t& reordered,
     ReorderMode mode,
     bool logging = false)
 {
-    auto computeBestForLeaf = [&](size_t count, const std::vector<size_t>* leafPointsPtr) {
-        PrunedRange best{0, count, OrderType::K0};
-        //const Point& centro = octree.getLeafCenter(leaf);
-        //std::cout << "Leaf " << leaf << ": Center =" << centro.getX() << " " << centro.getY() << " " << centro.getZ() << "\n" << std::endl;
+    const size_t count = reordered.getLeafPermutation(leaf, OrderType::K0).size();
+    const Point& center = octree.getLeafCenter(leaf);
+    const auto geo = detail::LeafQueryGeometry::compute(query, center, radius, kernel);
 
-        for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
-            PrunedRange r = computeRange(
-                leaf, query, radius, kernel, order,
-                octree, points, reordered, mode, logging, leafPointsPtr);
-            if (r.count() < best.count()) {
-                best = r;
-            }
-            detail::printLog(std::to_string(leaf) + "," + std::string(kernelToString(kernel)) + "," + std::string(localReorderTypeToString(mode)) + "," + std::to_string(radius) + "," + std::to_string(r.count()) + "," + std::to_string(count) + "," + std::to_string(static_cast<int>(order)));
-            /*if (logging) {
-                std::ostringstream oss;
-                oss << "Leaf " << leaf << " order=" << static_cast<int>(order)
-                    << " range=[" << r.iMin << "," << r.iMax << ") count=" << r.count();
-                std::cout << oss.str() << '\n';
-            }*/
-        }
+    PrunedRange best{0, count, 0,0,false, OrderType::K0};
 
-        if (logging) {
-            std::cout << "Leaf " << leaf << ": best order=" << static_cast<int>(best.order)
-                    << " count=" << best.count() << " / " << count << '\n';
-        }
-
-        return best;
-    };
-
-    if constexpr (requires { octree.getLeafPoints(leaf); }) {
-        const auto& leafPoints = octree.getLeafPoints(leaf);
-        return computeBestForLeaf(leafPoints.size(), &leafPoints);
-    } else {
-        const auto [begin, end] = octree.getLeafRange(leaf);
-        return computeBestForLeaf(end - begin, nullptr);
+    for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
+        PrunedRange r = computeRange(leaf, kernel, order, octree, count, reordered, mode, geo);
+        if (r.count() < best.count())
+            best = r;
     }
+
+    if (logging)
+        std::cout << "Leaf " << leaf << ": best order=" << static_cast<int>(best.order)
+                  << " count=" << best.count() << " / " << count << '\n';
+
+    return best;
 }

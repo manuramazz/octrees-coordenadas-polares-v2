@@ -18,6 +18,7 @@
 #include "kernels/kernel_factory.hpp"
 #include "main_options.hpp"
 #include "neighbor_set.hpp"
+#include "structures/octree_types.hpp"
 
 /**
 * @class LinearOctree
@@ -650,7 +651,7 @@ protected:
     }
 
 public:    
-    using RangeFn = std::function<std::tuple<const std::vector<size_t>*, size_t, size_t>(uint32_t, const Point&, double)>;
+    using RangeFn = std::function<std::tuple<const std::vector<size_t>*, PrunedRange>(uint32_t, const Point&, double)>;
 
     /**
      * @brief Builds the linear octree given an array of points, also reporting how much time each step takes
@@ -777,7 +778,7 @@ public:
                     return false;
             }
         };
-        
+        ///TODO: arreglar esta función
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
             assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsStruct::findAndInsertPoints");
@@ -786,36 +787,46 @@ public:
             size_t endIndex = this->internalRanges[nodeIndex].second;
             assert(startIndex <= endIndex && "invalid range in internalRanges");
             assert(endIndex <= points.size() && "internalRanges points end out of bounds");
-
+            size_t rangeStart = startIndex;
             if (getRange) {
                 assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsStruct");
-                    const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
                     if (perm != nullptr) {
-                        assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
-                        assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
-                        for (size_t i = iMin; i < iMax; ++i) {
+                        for (size_t i = range.iMin; i < range.iMax; ++i) {
                             const size_t pointIndex = startIndex + (*perm)[i];
-                            assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
-                            assert(pointIndex < points.size() && "pointIndex out of points bounds in neighborsStruct");
-                            if (pointIndex < endIndex && k.isInside(points[pointIndex])) {
-                                result.addRange(pointIndex, pointIndex + 1);
+                            if (!k.isInside(points[pointIndex])) {
+                                if (rangeStart < i)
+                                    result.addRange(rangeStart, i);
+                                rangeStart = i + 1;
                             }
                         }
-                        return;
+                        
+                        if (range.hasSecond) {
+                            if (rangeStart < range.iMax)
+                                result.addRange(rangeStart, range.iMax);
+                            rangeStart = range.iMin2;
+                            for (size_t i = range.iMin2; i < range.iMax2; ++i) {
+                                const size_t pointIndex = startIndex + (*perm)[i];
+                                if (!k.isInside(points[pointIndex])){
+                                    if (rangeStart < i)
+                                        result.addRange(rangeStart, i);
+                                    rangeStart = i + 1;
+                                }
+                            }
+                        }
                     }
                 }
             }
-
-            size_t rangeStart = startIndex;
-            
-            for (size_t i = startIndex; i < endIndex; ++i) {
-                if (!k.isInside(points[i])) {
-                    if (rangeStart < i)
-                        result.addRange(rangeStart, i);
-                    rangeStart = i + 1;
+            else{
+                for (size_t i = startIndex; i < endIndex; ++i) {
+                    if (!k.isInside(points[i])) {
+                        if (rangeStart < i)
+                            result.addRange(rangeStart, i);
+                        rangeStart = i + 1;
+                    }
                 }
             }
             
@@ -891,19 +902,23 @@ public:
             if (getRange) {
                 assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+                //std::cout << "Leaf n "<< leafIndex << ": [" << startIndex << ", " << endIndex << ")\n";
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
-                    const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
                     if (perm != nullptr) {
-                        assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
-                        assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
                         //log de perm;
-                        for (size_t i = iMin; i < iMax; ++i) {
+                        for (size_t i = range.iMin; i < range.iMax; ++i) {
                             const size_t pointIndex = startIndex + (*perm)[i];
-                            assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
-                            assert(pointIndex < points.size() && "pointIndex out of points bounds in neighborsPrune");
                             if (k.isInside(points[pointIndex])) {
                                 ptsInside.push_back(pointIndex);
+                            }
+                        }
+                        if (range.hasSecond) {
+                            for (size_t i = range.iMin2; i < range.iMax2; ++i) {
+                                const size_t pointIndex = startIndex + (*perm)[i];
+                                if (k.isInside(points[pointIndex]))
+                                    ptsInside.push_back(pointIndex);
                             }
                         }
                         return;
@@ -964,16 +979,19 @@ public:
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighbors");
-                    const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
                     if (perm != nullptr) {
-                        assert(iMin <= iMax && "bestRange devolvio iMin > iMax");
-                        assert(iMax <= perm->size() && "bestRange devolvió iMax fuera de rango");
-                        for (size_t i = iMin; i < iMax; ++i) {
+                        for (size_t i = range.iMin; i < range.iMax; ++i) {
                             const size_t pointIndex = startIndex + (*perm)[i];
-                            assert(pointIndex < endIndex && "getRange returned an out-of-bounds index");
-                            assert(pointIndex < points.size() && "pointIndex out of points bounds in neighbors");
-                            if (k.isInside(points[pointIndex]) && condition(points[pointIndex])) {
+                            if (k.isInside(points[pointIndex])) {
                                 ptsInside.push_back(pointIndex);
+                            }
+                        }
+                        if (range.hasSecond) {
+                            for (size_t i = range.iMin2; i < range.iMax2; ++i) {
+                                const size_t pointIndex = startIndex + (*perm)[i];
+                                if (k.isInside(points[pointIndex]))
+                                    ptsInside.push_back(pointIndex);
                             }
                         }
                         return;

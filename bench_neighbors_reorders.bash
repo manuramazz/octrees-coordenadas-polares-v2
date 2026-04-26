@@ -16,17 +16,17 @@ datasets_high_density=(
 )
 
 N_SEARCHES="5000"
-FULL_OURS="neighbors,neighborsPrune,neighborsPtr,neighborsStruct"
+FULL_OURS="neighbors,neighborsPrune,neighborsPtr"
 FULL_ALGOS_RADIUS="neighbors,neighborsPrune,neighborsPtr,neighborsStruct"
 THREADS="1,2,4,8,16,24,32,40"
 
 
 # subset searches
 for data in "${datasets_low_density[@]}"; do
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER/subset" -r "0.5,1.0,2.0,3.0" -s "$N_SEARCHES" --repeats 5 -a "$FULL_ALGOS_RADIUS" --local-reorder "none,spherical,cylindrical"
+  ./build/octrees-benchmark -i "$data" -o "$FOLDER/subset" --kernels "cube,sphere" -r "0.5,1.0,2.0,3.0" -s "$N_SEARCHES" --repeats 5 -a "$FULL_ALGOS_RADIUS" --local-reorder "none,spherical,cylindrical"
 done
 for data in "${datasets_high_density[@]}"; do
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER/subset" -r "0.01,0.05,0.1,0.2" -s "$N_SEARCHES" --repeats 5 -a "$FULL_ALGOS_RADIUS" --local-reorder "none,spherical,cylindrical"
+  ./build/octrees-benchmark -i "$data" -o "$FOLDER/subset" --kernels "cube,sphere" -r "0.01,0.05,0.1,0.2" -s "$N_SEARCHES" --repeats 5 -a "$FULL_ALGOS_RADIUS" --local-reorder "none,spherical,cylindrical"
 done
 
 # full searches

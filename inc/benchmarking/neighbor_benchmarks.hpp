@@ -213,7 +213,6 @@ class NeighborsBenchmark {
                         testRadius,
                         kernel,
                         oct,
-                        points,
                         reordered,
                         mode,
                         false);
@@ -504,9 +503,9 @@ class NeighborsBenchmark {
             if (mode != ReorderMode::None) {
                 getRange = [&](uint32_t leafIndex, const Point& query, double radius) {
                     PrunedRange range = bestRange(leafIndex, query, radius, kernel,
-                                                oct, points, reordered, mode, false);
+                                                oct, reordered, mode, false);
                     const auto& perm = reordered.getLeafPermutation(leafIndex, range.order);
-                    return std::make_tuple(&perm, range.iMin, range.iMax);
+                    return std::make_tuple(&perm, range);
                 };
             }
 
@@ -584,9 +583,9 @@ class NeighborsBenchmark {
             if (mode != ReorderMode::None) {
                 getRange = [&](uint32_t leafIndex, const Point& query, double radius) {
                     PrunedRange range = bestRange(leafIndex, query, radius, kernel,
-                                                oct, points, reordered, mode, false);
+                                                oct, reordered, mode, false);
                     const auto& perm = reordered.getLeafPermutation(leafIndex, range.order);
-                    return std::make_tuple(&perm, range.iMin, range.iMax);
+                    return std::make_tuple(&perm, range);
                 };
             }
 
@@ -594,7 +593,7 @@ class NeighborsBenchmark {
                 auto neighborsPtrSearch = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
-                    //#pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                    #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                         for(size_t i = 0; i<searchSet.numSearches; i++) {
                             //std::cout << "Search " << i << "/" << searchSet.numSearches << "\n" << std::flush;
                             auto result = oct.template searchNeighbors<kernel>(points[searchIndexes[i]], radius, getRange);

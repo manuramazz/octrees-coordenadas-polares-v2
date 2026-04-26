@@ -26,17 +26,21 @@ public:
     Luego en el proceso de búsqueda -> si se elimina o se incluye por completo no hago nada -> si se incluye parcialmente -> 
     tengo que hacer los cálculos para ver que clave elimina más volumen de la hoja -> uso esa reordenación para eliminar/incluir puntos de la hoja.
     */
-    /// TODO: mirar que funcione bien openMP
+    /// TODO: 
+    // optimizar la función de cálculo de claves para cada punto (precomputar dx, dy, dz, rxy, etc)
     /*TODO: OPTIMIZACIONES PARA LUEGO: usar float en vez de double
     evitar sqrt
-    precomputar (dx,dy) una sola vez por hoja
     no calcular acos para todos los puntos*/
 
     struct LeafPermutations {
         std::array<std::vector<size_t>, 3> perms;
     };
+    struct LeafKeys {
+        std::array<std::vector<double>, 3> keys;
+    };
 
     std::vector<LeafPermutations> leafPerms;
+    std::vector<LeafKeys> leafKeys;
 
 
     // ============================================================
@@ -53,6 +57,7 @@ public:
 
         size_t numLeaves = octree.getNumLeaves();
         leafPerms.resize(numLeaves);
+        leafKeys.resize(numLeaves);
 
         #pragma omp parallel for schedule(dynamic)
         for (size_t leaf = 0; leaf < numLeaves; ++leaf)
@@ -88,13 +93,9 @@ public:
 
             const auto& center = octree.getLeafCenter(leaf);
 
-            // claves por dimensión
-            std::array<std::vector<double>, 2> keys;
-            for (int k = 0; k < 2; ++k)
-                keys[k].resize(count);
-
-            // inicializar permutaciones
+            // inicializar permutaciones y claves
             for (int k = 0; k < 3; ++k) {
+                leafKeys[leaf].keys[k].resize(count);
                 leafPerms[leaf].perms[k].resize(count);
                 std::iota(leafPerms[leaf].perms[k].begin(),
                           leafPerms[leaf].perms[k].end(), 0);
@@ -103,10 +104,6 @@ public:
             // --------------------------------
             // calcular claves
             // --------------------------------
-            std::vector<double> dxVals(count);
-            std::vector<double> dyVals(count);
-            std::vector<double> rxyVals(count);
-
             for (size_t i = 0; i < count; ++i)
             {
                 // Obtener índice global del punto (i) en la hoja (linear: directo -- ptr: a través de leafPoints)
@@ -126,78 +123,44 @@ public:
                     dz = points[idx].getZ() - center.getZ();
                 }
 
+                const double phi = detail::normalizeAngle0To2Pi(std::atan2(dy, dx));
                 const double rxy = std::sqrt(dx * dx + dy * dy);
-                dxVals[i] = dx;
-                dyVals[i] = dy;
-                rxyVals[i] = rxy;
 
                 if (mode == ReorderMode::Cylindrical)
                 {
-                    keys[0][i] = rxy;
-                    keys[1][i] = dz;
+                    leafKeys[leaf].keys[0][i] = phi;
+                    leafKeys[leaf].keys[1][i] = rxy;
+                    leafKeys[leaf].keys[2][i] = dz;
                 }
                 else // Spherical
                 {
                     const double r = std::sqrt(rxy * rxy + dz * dz);
                     double theta = (r > 0.0) ? std::acos(std::clamp(dz / r, -1.0, 1.0)) : 0.0;
-                    keys[0][i] = theta;
-                    keys[1][i] = r;
+                    leafKeys[leaf].keys[0][i] = phi;
+                    leafKeys[leaf].keys[1][i] = theta;
+                    leafKeys[leaf].keys[2][i] = r;
                 }
             }
 
-            // K0: orden angular en XY sin atan2 usando semiplanos y producto cruzado.
-            auto angleLess = [&](size_t i, size_t j) {
-                if (i == j)
-                    return false;
-
-                const double x1 = dxVals[i];
-                const double y1 = dyVals[i];
-                const double x2 = dxVals[j];
-                const double y2 = dyVals[j];
-
-                const bool origin1 = (x1 == 0.0 && y1 == 0.0);
-                const bool origin2 = (x2 == 0.0 && y2 == 0.0);
-
-                if (origin1 != origin2)
-                    return origin1;
-
-                if (origin1)
-                    return i < j;
-
-                const bool upper1 = (y1 > 0.0) || (y1 == 0.0 && x1 >= 0.0);
-                const bool upper2 = (y2 > 0.0) || (y2 == 0.0 && x2 >= 0.0);
-
-                if (upper1 != upper2)
-                    return upper1;
-
-                const double cross = x1 * y2 - y1 * x2;
-                if (cross != 0.0)
-                    return cross > 0.0;
-
-                if (rxyVals[i] != rxyVals[j])
-                    return rxyVals[i] < rxyVals[j];
-
-                return i < j;
-            };
-
-            // ordenar por K0 usando angleLess (comparativa de cuadrantes + producto cruzado)
-
-            auto& permK0 = leafPerms[leaf].perms[static_cast<int>(OrderType::K0)];
-            std::sort(permK0.begin(), permK0.end(), angleLess);
-
             // --------------------------------
-            // ordenar permutaciones por claves K1 y K2
+            // ordenar permutaciones por claves KO, K1 y K2
             // --------------------------------
-            for (int k = 0; k < 2; ++k)
+            std::vector<double> sortedK(count);
+            for (int k = 0; k < 3; ++k)
             {
-                auto& perm = leafPerms[leaf].perms[k+1];
+                auto& perm = leafPerms[leaf].perms[k];
 
                 std::sort(
                     perm.begin(),
                     perm.end(),
                     [&](size_t a, size_t b) {
-                        return keys[k][a] < keys[k][b];
-                    });
+                        return leafKeys[leaf].keys[k][a] < leafKeys[leaf].keys[k][b];
+                });
+                // Reordenar el vector de claves con el orden de perms
+                
+                for (size_t i = 0; i < count; ++i)
+                    sortedK[i] = leafKeys[leaf].keys[k][perm[i]];
+                leafKeys[leaf].keys[k] = sortedK;
             }
         }
     }
@@ -209,6 +172,11 @@ public:
     const std::vector<size_t>& getLeafPermutation(size_t leaf, OrderType type) const {
          return leafPerms[leaf].perms[static_cast<int>(type)];
     }
+
+    const std::vector<double>& getLeafKeys(size_t leaf, OrderType type) const {
+         return leafKeys[leaf].keys[static_cast<int>(type)];
+    }
+
 
     // ============================================================
     // Variante de debug para verificar OpenMP y permutaciones

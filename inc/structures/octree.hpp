@@ -17,6 +17,7 @@
 #include "geometry/point_metadata.hpp"
 #include "geometry/point_containers.hpp"
 #include "kernels/kernel_factory.hpp"
+#include "structures/octree_types.hpp"
 
 template <PointContainer Container>
 class Octree
@@ -37,7 +38,7 @@ class Octree
 	public:
 	Octree() = delete;
 
-	using RangeFn = std::function<std::tuple<const std::vector<size_t>*, size_t, size_t>(uint32_t, const Point&, double)>;
+    using RangeFn = std::function<std::tuple<const std::vector<size_t>*, PrunedRange>(uint32_t, const Point&, double)>;
 
 	// root constructors
 	explicit Octree(Container& container, Box box);
@@ -205,12 +206,10 @@ class Octree
 			{
 				if (getRange && octree.getNumPoints() > 0) {
 					const auto searchRadius = k.radii().getX();
-					const auto [perm, iMin, iMax] = getRange(static_cast<uint32_t>(octree.getLeafIndex()), k.center(), searchRadius);
+					const auto [perm, range] = getRange(static_cast<uint32_t>(octree.getLeafIndex()), k.center(), searchRadius);
 					if (perm != nullptr) {
-						assert(iMin <= iMax && "bestRange returned iMin > iMax");
-						assert(iMax <= perm->size() && "bestRange returned iMax out of range");
 						const auto& leafPoints = octree.getPoints();
-						for (size_t i = iMin; i < iMax; ++i) {
+						for (size_t i = range.iMin; i < range.iMax; ++i) {
 							const size_t globalIdx = leafPoints[(*perm)[i]];
 							const auto& point = octree.container_[globalIdx];
 							if (k.isInside(point) && condition(point)) {
@@ -218,9 +217,19 @@ class Octree
 								ptsInside.emplace_back(globalIdx);
 							}
 						}
-						continue;
+						if(range.hasSecond) {
+							for (size_t i = range.iMin2; i < range.iMax2; ++i) {
+								const size_t globalIdx = leafPoints[(*perm)[i]];
+								const auto& point = octree.container_[globalIdx];
+								if (k.isInside(point) && condition(point)) {
+									//std::cout << globalIdx << " " << point.getX() << " " << point.getY() << " " << point.getZ() << "\n" << std::endl;
+									ptsInside.emplace_back(globalIdx);
+								}
+							}
+
+						}
 					}
-				}
+				} else {
 
 					for (size_t globalIdx : octree.getPoints()) {
 						const auto& point = octree.container_[globalIdx];
@@ -229,6 +238,7 @@ class Octree
 							ptsInside.emplace_back(globalIdx);
 						}
 					}
+				}
 				
 			}
 			else
