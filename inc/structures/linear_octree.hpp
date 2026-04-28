@@ -9,6 +9,7 @@
 #include <functional>
 #include <tuple>
 #include <type_traits>
+#include "util.hpp"
 #include "benchmarking/build_log.hpp"
 #include "benchmarking/time_watcher.hpp"
 #include "encoding/no_encoding.hpp"
@@ -19,6 +20,15 @@
 #include "main_options.hpp"
 #include "neighbor_set.hpp"
 #include "structures/octree_types.hpp"
+
+// Global variables for findAndInsertPoints timing logging
+namespace {
+    bool enableFindAndInsertPointsLogging = true;
+    bool hasLoggedThisSearch = false;
+    bool usedGetRangeThisSearch = false;
+    double accumulatedGetRangeTime = 0.0;
+    double accumulatedLoopTime = 0.0;
+}
 
 /**
 * @class LinearOctree
@@ -150,6 +160,9 @@ protected:
 
     /// @brief A vector containing the half-lengths of the minimum measure of the encoding.
     double halfLengths[3];
+
+    mutable std::optional<std::filesystem::path> rangeTimingLogPath;
+    mutable bool rangeTimingLogHeaderWritten = false;
 
 
 
@@ -779,6 +792,7 @@ public:
             }
         };
         ///TODO: arreglar esta función
+        resetFindAndInsertPointsAccumulators();
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
             assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsStruct::findAndInsertPoints");
@@ -788,13 +802,26 @@ public:
             assert(startIndex <= endIndex && "invalid range in internalRanges");
             assert(endIndex <= points.size() && "internalRanges points end out of bounds");
             size_t rangeStart = startIndex;
+            TimeWatcher getRangeWatcher;
+            TimeWatcher loopWatcher;
             if (getRange) {
                 assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsStruct");
+                    if (enableFindAndInsertPointsLogging) {
+                        usedGetRangeThisSearch = true;
+                        getRangeWatcher.start();
+                    }
                     const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    if (enableFindAndInsertPointsLogging) {
+                        getRangeWatcher.stop();
+                        accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
+                    }
                     if (perm != nullptr) {
+                        if (enableFindAndInsertPointsLogging) {
+                            loopWatcher.start();
+                        }
                         for (size_t i = range.iMin; i < range.iMax; ++i) {
                             const size_t pointIndex = startIndex + (*perm)[i];
                             if (!k.isInside(points[pointIndex])) {
@@ -803,11 +830,18 @@ public:
                                 rangeStart = i + 1;
                             }
                         }
-                        
+                        if (enableFindAndInsertPointsLogging) {
+                            loopWatcher.stop();
+                            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                        }
+
                         if (range.hasSecond) {
                             if (rangeStart < range.iMax)
                                 result.addRange(rangeStart, range.iMax);
                             rangeStart = range.iMin2;
+                            if (enableFindAndInsertPointsLogging) {
+                                loopWatcher.start();
+                            }
                             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
                                 const size_t pointIndex = startIndex + (*perm)[i];
                                 if (!k.isInside(points[pointIndex])){
@@ -816,17 +850,28 @@ public:
                                     rangeStart = i + 1;
                                 }
                             }
+                            if (enableFindAndInsertPointsLogging) {
+                                loopWatcher.stop();
+                                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                            }
                         }
                     }
                 }
             }
             else{
+                if (enableFindAndInsertPointsLogging) {
+                    loopWatcher.start();
+                }
                 for (size_t i = startIndex; i < endIndex; ++i) {
                     if (!k.isInside(points[i])) {
                         if (rangeStart < i)
                             result.addRange(rangeStart, i);
                         rangeStart = i + 1;
                     }
+                }
+                if (enableFindAndInsertPointsLogging) {
+                    loopWatcher.stop();
+                    accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                 }
             }
             
@@ -835,6 +880,7 @@ public:
         };
         
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius);
         return result;
 	}
 
@@ -842,11 +888,67 @@ public:
     * @brief Auxiliar func to log selected ranges during searches with getRange
     */
     void logLeafRange(uint32_t leafIndex, size_t iMin, size_t iMax) const {
-        std::cout << "Logging leaf range for leaf " << leafIndex << ": [" << iMin << ", " << iMax << ")\n";
         std::filesystem::path leafRangeLogPath = mainOptions.outputDirName / "leaf_range_log.log";
         std::ofstream leafRangeLogFile(leafRangeLogPath, std::ios_base::app);
         if (leafRangeLogFile.is_open()) {
             leafRangeLogFile << "Leaf " << leafIndex << ": [" << iMin << ", " << iMax << ")\n";
+        }
+    }
+
+    std::filesystem::path getFindAndInsertPointsLogPath() const {
+        if (!rangeTimingLogPath.has_value()) {
+            std::filesystem::path logDir = std::filesystem::path("logs") / "v1.1";
+            std::filesystem::create_directories(logDir);
+            const std::string baseName = mainOptions.inputFileName.empty() ? std::string("octree") : mainOptions.inputFileName;
+            rangeTimingLogPath = logDir / (baseName + "_spherical.csv");
+        }
+        return *rangeTimingLogPath;
+    }
+
+    void resetFindAndInsertPointsAccumulators() const {
+        hasLoggedThisSearch = false;
+        usedGetRangeThisSearch = false;
+        accumulatedGetRangeTime = 0.0;
+        accumulatedLoopTime = 0.0;
+    }
+
+    void writeFindAndInsertPointsLog(const std::string& kernelName, double radius) const {
+        if (!enableFindAndInsertPointsLogging || hasLoggedThisSearch) {
+            return;
+        }
+        
+        const std::filesystem::path logPath = getFindAndInsertPointsLogPath();
+        std::ofstream logFile(logPath, std::ios::app);
+        if (!logFile.is_open()) {
+            return;
+        }
+
+        if (!rangeTimingLogHeaderWritten) {
+            rangeTimingLogHeaderWritten = true;
+            std::error_code ec;
+            if (!std::filesystem::exists(logPath, ec) || std::filesystem::file_size(logPath, ec) == 0) {
+                logFile << "kernel,radius,get_range,get_range_time,loop_time\n";
+            }
+        }
+
+        logFile << kernelName << ","
+                << std::to_string(radius) << ","
+                << std::boolalpha << usedGetRangeThisSearch << ","
+                << accumulatedGetRangeTime << ","
+                << accumulatedLoopTime << "\n";
+        hasLoggedThisSearch = true;
+    }
+
+    template<typename Kernel>
+    static std::string getKernelName(const Kernel&) {
+        if constexpr (std::is_same_v<std::decay_t<Kernel>, KernelSphere>) {
+            return std::string(kernelToString(Kernel_t::sphere));
+        } else if constexpr (std::is_same_v<std::decay_t<Kernel>, KernelCircle>) {
+            return std::string(kernelToString(Kernel_t::circle));
+        } else if constexpr (std::is_same_v<std::decay_t<Kernel>, KernelSquare>) {
+            return std::string(kernelToString(Kernel_t::square));
+        } else {
+            return std::string(kernelToString(Kernel_t::cube));
         }
     }
 
@@ -889,6 +991,7 @@ public:
             }
         };
         
+        resetFindAndInsertPointsAccumulators();
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
             assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::findAndInsertPoints");
@@ -897,6 +1000,8 @@ public:
             size_t endIndex = this->internalRanges[nodeIndex].second;
             assert(startIndex <= endIndex && "invalid range in internalRanges");
             assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+            TimeWatcher getRangeWatcher;
+            TimeWatcher loopWatcher;
             // If getRange provided -> uses polar coords optimization
             // Only checks points inside range returned by bestRange (from octree_range_selector)
             if (getRange) {
@@ -905,20 +1010,42 @@ public:
                 //std::cout << "Leaf n "<< leafIndex << ": [" << startIndex << ", " << endIndex << ")\n";
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
+                    if (enableFindAndInsertPointsLogging) {
+                        usedGetRangeThisSearch = true;
+                        getRangeWatcher.start();
+                    }
                     const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    if (enableFindAndInsertPointsLogging) {
+                        getRangeWatcher.stop();
+                        accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
+                    }
                     if (perm != nullptr) {
                         //log de perm;
+                        if (enableFindAndInsertPointsLogging) {
+                            loopWatcher.start();
+                        }
                         for (size_t i = range.iMin; i < range.iMax; ++i) {
                             const size_t pointIndex = startIndex + (*perm)[i];
                             if (k.isInside(points[pointIndex])) {
                                 ptsInside.push_back(pointIndex);
                             }
                         }
+                        if (enableFindAndInsertPointsLogging) {
+                            loopWatcher.stop();
+                            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                        }
                         if (range.hasSecond) {
+                            if (enableFindAndInsertPointsLogging) {
+                                loopWatcher.start();
+                            }
                             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
                                 const size_t pointIndex = startIndex + (*perm)[i];
                                 if (k.isInside(points[pointIndex]))
                                     ptsInside.push_back(pointIndex);
+                            }
+                            if (enableFindAndInsertPointsLogging) {
+                                loopWatcher.stop();
+                                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                             }
                         }
                         return;
@@ -926,13 +1053,21 @@ public:
                 }
             }
 
+            if (enableFindAndInsertPointsLogging) {
+                loopWatcher.start();
+            }
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(points[i])) {
                     ptsInside.push_back(i);
                 }
             }
+            if (enableFindAndInsertPointsLogging) {
+                loopWatcher.stop();
+                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+            }
         };
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius);
         return ptsInside;
 	}
 
@@ -958,6 +1093,7 @@ public:
             return k.boxOverlap(this->centers[nodeIndex], this->precomputedRadii[nodeDepth]);
         };
         
+        resetFindAndInsertPointsAccumulators();
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
 
@@ -973,25 +1109,49 @@ public:
             size_t endIndex = this->internalRanges[nodeIndex].second;
             assert(startIndex <= endIndex && "invalid range in internalRanges");
             assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+            TimeWatcher getRangeWatcher;
+            TimeWatcher loopWatcher;
 
             if (getRange) {
                 assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighbors");
+                    if (enableFindAndInsertPointsLogging) {
+                        usedGetRangeThisSearch = true;
+                        getRangeWatcher.start();
+                    }
                     const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    if (enableFindAndInsertPointsLogging) {
+                        getRangeWatcher.stop();
+                        accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
+                    }
                     if (perm != nullptr) {
+                        if (enableFindAndInsertPointsLogging) {
+                            loopWatcher.start();
+                        }
                         for (size_t i = range.iMin; i < range.iMax; ++i) {
                             const size_t pointIndex = startIndex + (*perm)[i];
                             if (k.isInside(points[pointIndex])) {
                                 ptsInside.push_back(pointIndex);
                             }
                         }
+                        if (enableFindAndInsertPointsLogging) {
+                            loopWatcher.stop();
+                            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                        }
                         if (range.hasSecond) {
+                            if (enableFindAndInsertPointsLogging) {
+                                loopWatcher.start();
+                            }
                             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
                                 const size_t pointIndex = startIndex + (*perm)[i];
                                 if (k.isInside(points[pointIndex]))
                                     ptsInside.push_back(pointIndex);
+                            }
+                            if (enableFindAndInsertPointsLogging) {
+                                loopWatcher.stop();
+                                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                             }
                         }
                         return;
@@ -1000,13 +1160,21 @@ public:
             }
 
             // Normal case, check all points in the leaf
+            if (enableFindAndInsertPointsLogging) {
+                loopWatcher.start();
+            }
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(points[i]) && condition(points[i])) {
                     ptsInside.push_back(i);
                 }
             }
+            if (enableFindAndInsertPointsLogging) {
+                loopWatcher.stop();
+                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+            }
         };
         singleTraversal(intersectsKernel, findAndInsertPoints);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius);
         return ptsInside;
 	}
 
