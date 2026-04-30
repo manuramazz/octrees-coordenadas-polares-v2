@@ -12,7 +12,15 @@ No sé por qué pasa y no sé por qué los métodos K1 y K2 son tan irrelevantes
 23/04
 Leaf 38: best order=0 count=12 / 17 AQUI SE PIERDEN PUNTOS: MIRAR A MANO SI LA DISTANCIA ES MENOR A 15
 
+ No estoy gestionando los kernels 2D ARREGLAR
+ precomputar cosas en las búsquedas
+ k1 cylindrical muy malo
 
-TODO No estoy gestionando los kernels 2D ARREGLAR
-TODO precomputar cosas en las búsquedas
-TODO k1 cylindrical muy malo
+COSAS PARA HACER JUEVES 30/04
+2- Pensar como quiero agrupar los datos para mostrarlos en las graficas (diferentes kernels,radios,datasets) hablarlo con gemini
+3- Hacer opciones globales el degub de rangos y el debug de tiempo de loop
+4- Mandar scripts al cesga 
+5- Preparar notebook para visualizar resultados
+
+6- Optimizaciones aparte: - intersecar rangos de los 3 métodos
+                        - ¿hacer vectores de puntos en vez de perms para mantener localidad caché?

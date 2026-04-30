@@ -219,6 +219,8 @@ public:
 
 
 	bool debug{false};
+	bool debugRanges{false};
+	bool debugLeavesTime{false};
 	bool buildEncBenchmarks{false};
 	std::optional<SearchStructure> memoryStructure{std::nullopt};
 	bool localityBenchmarks{false};
@@ -250,6 +252,8 @@ enum LongOptions : int
 	ENCODINGS,
 	LOCAL_REORDERS,
 	DEBUG,
+	DEBUG_RANGES,
+	DEBUG_LEAVES_TIME,
 	BUILD_ENC,
 	MEMORY,
 	LOCALITY,
@@ -282,6 +286,8 @@ const option long_opts[] = {
 	{ "local-reorders", required_argument, nullptr, LongOptions::LOCAL_REORDERS },
 
 	{ "debug", no_argument, nullptr, LongOptions::DEBUG },
+	{ "debug-ranges", no_argument, nullptr, LongOptions::DEBUG_RANGES },
+	{ "debug-leaves-time", no_argument, nullptr, LongOptions::DEBUG_LEAVES_TIME },
 	{ "build-enc", no_argument, nullptr, LongOptions::BUILD_ENC },
 	{ "memory", required_argument, nullptr, LongOptions::MEMORY },
 	{ "locality", no_argument, nullptr, LongOptions::LOCALITY },

@@ -3,12 +3,15 @@
 #include <optional>
 #include <bitset>
 #include <cassert>
+#include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <unordered_map>
 #include <filesystem>
 #include <functional>
 #include <tuple>
 #include <type_traits>
+#include <sstream>
 #include "util.hpp"
 #include "benchmarking/build_log.hpp"
 #include "benchmarking/time_watcher.hpp"
@@ -21,11 +24,8 @@
 #include "neighbor_set.hpp"
 #include "structures/octree_types.hpp"
 
-// Global variables for findAndInsertPoints timing logging
 namespace {
-    bool enableFindAndInsertPointsLogging = true;
     bool hasLoggedThisSearch = false;
-    bool usedGetRangeThisSearch = false;
     double accumulatedGetRangeTime = 0.0;
     double accumulatedLoopTime = 0.0;
 }
@@ -767,7 +767,7 @@ public:
      * @return Points inside the given kernel type.
      */
     template<typename Kernel>
-    [[nodiscard]] NeighborSet<Container> neighborsStruct(const Kernel& k, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] NeighborSet<Container> neighborsStruct(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
         NeighborSet<Container> result(&points);
         const double searchRadius = k.radii().getX();
         auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
@@ -809,17 +809,16 @@ public:
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsStruct");
-                    if (enableFindAndInsertPointsLogging) {
-                        usedGetRangeThisSearch = true;
+                    if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
                     const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
-                    if (enableFindAndInsertPointsLogging) {
+                    if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
                     }
                     if (perm != nullptr) {
-                        if (enableFindAndInsertPointsLogging) {
+                        if (mainOptions.debugLeavesTime) {
                             loopWatcher.start();
                         }
                         for (size_t i = range.iMin; i < range.iMax; ++i) {
@@ -830,7 +829,7 @@ public:
                                 rangeStart = i + 1;
                             }
                         }
-                        if (enableFindAndInsertPointsLogging) {
+                        if (mainOptions.debugLeavesTime) {
                             loopWatcher.stop();
                             accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                         }
@@ -839,7 +838,7 @@ public:
                             if (rangeStart < range.iMax)
                                 result.addRange(rangeStart, range.iMax);
                             rangeStart = range.iMin2;
-                            if (enableFindAndInsertPointsLogging) {
+                            if (mainOptions.debugLeavesTime) {
                                 loopWatcher.start();
                             }
                             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
@@ -850,7 +849,7 @@ public:
                                     rangeStart = i + 1;
                                 }
                             }
-                            if (enableFindAndInsertPointsLogging) {
+                            if (mainOptions.debugLeavesTime) {
                                 loopWatcher.stop();
                                 accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                             }
@@ -859,7 +858,7 @@ public:
                 }
             }
             else{
-                if (enableFindAndInsertPointsLogging) {
+                if (mainOptions.debugLeavesTime) {
                     loopWatcher.start();
                 }
                 for (size_t i = startIndex; i < endIndex; ++i) {
@@ -869,7 +868,7 @@ public:
                         rangeStart = i + 1;
                     }
                 }
-                if (enableFindAndInsertPointsLogging) {
+                if (mainOptions.debugLeavesTime) {
                     loopWatcher.stop();
                     accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                 }
@@ -880,7 +879,7 @@ public:
         };
         
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
-        writeFindAndInsertPointsLog(getKernelName(k), searchRadius);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
         return result;
 	}
 
@@ -897,23 +896,33 @@ public:
 
     std::filesystem::path getFindAndInsertPointsLogPath() const {
         if (!rangeTimingLogPath.has_value()) {
-            std::filesystem::path logDir = std::filesystem::path("logs") / "v1.1";
+            const std::filesystem::path logDir = mainOptions.outputDirName / "leaves-time";
             std::filesystem::create_directories(logDir);
             const std::string baseName = mainOptions.inputFileName.empty() ? std::string("octree") : mainOptions.inputFileName;
-            rangeTimingLogPath = logDir / (baseName + "_spherical.csv");
+            const auto now = std::chrono::system_clock::now();
+            const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+            std::tm tmSnapshot{};
+#ifdef _WIN32
+            localtime_s(&tmSnapshot, &nowTime);
+#else
+            localtime_r(&nowTime, &tmSnapshot);
+#endif
+
+            std::ostringstream stamp;
+            stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
+            rangeTimingLogPath = logDir / (baseName + "_" + stamp.str() + ".csv");
         }
         return *rangeTimingLogPath;
     }
 
     void resetFindAndInsertPointsAccumulators() const {
         hasLoggedThisSearch = false;
-        usedGetRangeThisSearch = false;
         accumulatedGetRangeTime = 0.0;
         accumulatedLoopTime = 0.0;
     }
 
-    void writeFindAndInsertPointsLog(const std::string& kernelName, double radius) const {
-        if (!enableFindAndInsertPointsLogging || hasLoggedThisSearch) {
+    void writeFindAndInsertPointsLog(const std::string& kernelName, double radius, ReorderMode mode) const {
+        if (!mainOptions.debugLeavesTime || hasLoggedThisSearch) {
             return;
         }
         
@@ -927,13 +936,13 @@ public:
             rangeTimingLogHeaderWritten = true;
             std::error_code ec;
             if (!std::filesystem::exists(logPath, ec) || std::filesystem::file_size(logPath, ec) == 0) {
-                logFile << "kernel,radius,get_range,get_range_time,loop_time\n";
+                logFile << "kernel,radius,mode,get_range_time,loop_time\n";
             }
         }
 
         logFile << kernelName << ","
                 << std::to_string(radius) << ","
-                << std::boolalpha << usedGetRangeThisSearch << ","
+                << localReorderTypeToString(mode) << ","
                 << accumulatedGetRangeTime << ","
                 << accumulatedLoopTime << "\n";
         hasLoggedThisSearch = true;
@@ -960,7 +969,7 @@ public:
      * @return Points inside the given kernel type.
      */
     template<typename Kernel>
-    [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
         std::vector<size_t> ptsInside;
         const double searchRadius = k.radii().getX();
         auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
@@ -1010,18 +1019,17 @@ public:
                 //std::cout << "Leaf n "<< leafIndex << ": [" << startIndex << ", " << endIndex << ")\n";
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
-                    if (enableFindAndInsertPointsLogging) {
-                        usedGetRangeThisSearch = true;
+                    if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
                     const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
-                    if (enableFindAndInsertPointsLogging) {
+                    if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
                     }
                     if (perm != nullptr) {
                         //log de perm;
-                        if (enableFindAndInsertPointsLogging) {
+                        if (mainOptions.debugLeavesTime) {
                             loopWatcher.start();
                         }
                         for (size_t i = range.iMin; i < range.iMax; ++i) {
@@ -1030,12 +1038,12 @@ public:
                                 ptsInside.push_back(pointIndex);
                             }
                         }
-                        if (enableFindAndInsertPointsLogging) {
+                        if (mainOptions.debugLeavesTime) {
                             loopWatcher.stop();
                             accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                         }
                         if (range.hasSecond) {
-                            if (enableFindAndInsertPointsLogging) {
+                            if (mainOptions.debugLeavesTime) {
                                 loopWatcher.start();
                             }
                             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
@@ -1043,7 +1051,7 @@ public:
                                 if (k.isInside(points[pointIndex]))
                                     ptsInside.push_back(pointIndex);
                             }
-                            if (enableFindAndInsertPointsLogging) {
+                            if (mainOptions.debugLeavesTime) {
                                 loopWatcher.stop();
                                 accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                             }
@@ -1053,7 +1061,7 @@ public:
                 }
             }
 
-            if (enableFindAndInsertPointsLogging) {
+            if (mainOptions.debugLeavesTime) {
                 loopWatcher.start();
             }
             for (size_t i = startIndex; i < endIndex; ++i) {
@@ -1061,13 +1069,13 @@ public:
                     ptsInside.push_back(i);
                 }
             }
-            if (enableFindAndInsertPointsLogging) {
+            if (mainOptions.debugLeavesTime) {
                 loopWatcher.stop();
                 accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
             }
         };
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
-        writeFindAndInsertPointsLog(getKernelName(k), searchRadius);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
         return ptsInside;
 	}
 
@@ -1082,7 +1090,7 @@ public:
      * @return Points inside the given kernel type and satisfying condition.
      */
     template<typename Kernel, typename Function, typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
-    [[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, Function&& condition, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, Function&& condition, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
         std::vector<size_t> ptsInside;
         const double searchRadius = k.radii().getX();
 
@@ -1117,17 +1125,16 @@ public:
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighbors");
-                    if (enableFindAndInsertPointsLogging) {
-                        usedGetRangeThisSearch = true;
+                    if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
                     const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
-                    if (enableFindAndInsertPointsLogging) {
+                    if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
                     }
                     if (perm != nullptr) {
-                        if (enableFindAndInsertPointsLogging) {
+                        if (mainOptions.debugLeavesTime) {
                             loopWatcher.start();
                         }
                         for (size_t i = range.iMin; i < range.iMax; ++i) {
@@ -1136,12 +1143,12 @@ public:
                                 ptsInside.push_back(pointIndex);
                             }
                         }
-                        if (enableFindAndInsertPointsLogging) {
+                        if (mainOptions.debugLeavesTime) {
                             loopWatcher.stop();
                             accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                         }
                         if (range.hasSecond) {
-                            if (enableFindAndInsertPointsLogging) {
+                            if (mainOptions.debugLeavesTime) {
                                 loopWatcher.start();
                             }
                             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
@@ -1149,7 +1156,7 @@ public:
                                 if (k.isInside(points[pointIndex]))
                                     ptsInside.push_back(pointIndex);
                             }
-                            if (enableFindAndInsertPointsLogging) {
+                            if (mainOptions.debugLeavesTime) {
                                 loopWatcher.stop();
                                 accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                             }
@@ -1160,7 +1167,7 @@ public:
             }
 
             // Normal case, check all points in the leaf
-            if (enableFindAndInsertPointsLogging) {
+            if (mainOptions.debugLeavesTime) {
                 loopWatcher.start();
             }
             for (size_t i = startIndex; i < endIndex; ++i) {
@@ -1168,20 +1175,20 @@ public:
                     ptsInside.push_back(i);
                 }
             }
-            if (enableFindAndInsertPointsLogging) {
+            if (mainOptions.debugLeavesTime) {
                 loopWatcher.stop();
                 accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
             }
         };
         singleTraversal(intersectsKernel, findAndInsertPoints);
-        writeFindAndInsertPointsLog(getKernelName(k), searchRadius);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
         return ptsInside;
 	}
 
     template<typename Kernel>
-    [[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] std::vector<size_t> neighbors(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
         constexpr auto dummyCondition = [](const Point&) { return true; };
-        return neighbors(k, dummyCondition, getRange);
+        return neighbors(k, dummyCondition, getRange, mode);
     }
 
     // Helper for kNN searches
@@ -1433,54 +1440,54 @@ public:
 
     // Overrides for working with a given radius/vector of radii before calling the actual search methods
     template<Kernel_t kernel_type = Kernel_t::square>
-    [[nodiscard]] inline NeighborSet<Container> neighborsStruct(const Point& p, double radius, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] inline NeighborSet<Container> neighborsStruct(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-        return neighborsStruct(kernel, getRange);
+        return neighborsStruct(kernel, getRange, mode);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
-    [[nodiscard]] inline NeighborSet<Container> neighborsStruct(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] inline NeighborSet<Container> neighborsStruct(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-        return neighborsStruct(kernel, getRange);
+        return neighborsStruct(kernel, getRange, mode);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::square>
-    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, double radius, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-        return neighborsPrune(kernel, getRange);
+        return neighborsPrune(kernel, getRange, mode);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
-    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-        return neighborsPrune(kernel, getRange);
+        return neighborsPrune(kernel, getRange, mode);
 	}
 
     template<Kernel_t kernel_type = Kernel_t::square>
-    [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-        return neighbors(kernel, getRange);
+        return neighbors(kernel, getRange, mode);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
-    [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr) const {
+    [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-        return neighbors(kernel, getRange);
+        return neighbors(kernel, getRange, mode);
 	}
 
     template<Kernel_t kernel_type = Kernel_t::square, class Function,
              typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
-    [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius, Function&& condition, const RangeFn& getRange = nullptr) const {
+        [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius, Function&& condition, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-        return neighbors(kernel, std::forward<Function>(condition), getRange);
+		return neighbors(kernel, std::forward<Function>(condition), getRange, mode);
 	}
 
     template<Kernel_t kernel_type = Kernel_t::square, class Function,
              typename = std::enable_if_t<!std::is_same_v<std::decay_t<Function>, RangeFn>>>
 	[[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, const Vector& radii,
-                                                              Function&& condition, const RangeFn& getRange = nullptr) const {
+                                                                                                                            Function&& condition, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-        return neighbors(kernel, std::forward<Function>(condition), getRange);
+		return neighbors(kernel, std::forward<Function>(condition), getRange, mode);
 	}
 
     template<Kernel_t kernel_type = Kernel_t::square>

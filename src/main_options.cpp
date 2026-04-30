@@ -48,6 +48,8 @@ void printHelp() {
 
 		<< "Other options:\n"
 		<< "--debug: Enable debug mode (measures octree build and encoding times)\n"
+		<< "--debug-ranges: Enable per-leaf range selector logging\n"
+		<< "--debug-leaves-time: Enable leaf timing debug logging for LinearOctree searches\n"
 		<< "--build-enc: Run benchmarks for the encoding and build of selected structures (the ones with a representative on -a / --search-algo)\n"
 		<< "--memory: Run a simple benchmark for measuring the memory consumed by an structure, so heap profiling can be easy. Possible values: ptrOct,linOct,unibnOct,nanoKD,pclOct,pclKD,picoTree\n"
 		<< "--locality: Run benchmarks for the analyzing the locality of the point cloud after given reorderings\n"
@@ -347,6 +349,12 @@ void processArgs(int argc, char** argv)
 				break;
 			case LongOptions::DEBUG:
 				mainOptions.debug = true;
+				break;
+			case LongOptions::DEBUG_RANGES:
+				mainOptions.debugRanges = true;
+				break;
+			case LongOptions::DEBUG_LEAVES_TIME:
+				mainOptions.debugLeavesTime = true;
 				break;
 			case LongOptions::BUILD_ENC:
 				mainOptions.buildEncBenchmarks = true;

@@ -18,7 +18,6 @@
 // ---------------------------------------------------------------
 
 bool headers = false;
-bool logFileBool = false;
 
 inline std::ofstream& getRangeSelectorLog() {
     static std::ofstream logFile = []() {
@@ -37,12 +36,11 @@ inline std::ofstream& getRangeSelectorLog() {
         std::ostringstream stamp;
         stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
 
-        fs::path logDir{"logs/v1.1/ranges"};
+        const std::filesystem::path logDir = mainOptions.outputDirName / "ranges";
         std::error_code ec;
-        fs::create_directories(logDir, ec);
+        std::filesystem::create_directories(logDir, ec);
 
-        // const fs::path logPath = logDir / (baseName + "_" + stamp.str() + ".log");
-        const fs::path logPath = logDir / (baseName +  ".log");
+        const std::filesystem::path logPath = logDir / (baseName + "_" + stamp.str() + ".log");
         return std::ofstream(logPath, std::ios::app);
     }();
     
@@ -165,7 +163,7 @@ PrunedRange bestRange(
         if (r.count() < best.count())
             best = r;
     }
-    if(logFileBool){
+    if (mainOptions.debugRanges) {
         printLog(std::to_string(leaf) + "," + std::string(kernelToString(kernel)) +","+ std::string(localReorderTypeToString(mode)) + "," + std::to_string(radius) + "," + std::to_string(best.count()) + "," + std::to_string(count) + "," +std::to_string(static_cast<int>(best.order)));
     }
     if (logging)
