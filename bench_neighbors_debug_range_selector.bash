@@ -20,8 +20,8 @@ ALGO="neighborsPrune"
 
 # range debug searches (subsets)
 for data in "${datasets_low_density[@]}"; do 
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER" --kernels "cube,sphere" -r "0.5,1.0,2.0,3.0" -s "$N_SEARCHES" --repeats 1 -a "$FULL_ALGOS_RADIUS" --local-reorder "none,spherical,cylindrical" --num-threads 1 --debug-ranges
+  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.5,1.0,2.0,3.0" -s "$N_SE  ARCHES" --repeats 1 -a "$FULL_ALGOS_RADIUS" --local-reorder "none,spherical,cylindrical" --num-threads 1 --debug-ranges
 done
 for data in "${datasets_high_density[@]}"; do
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER" --kernels "cube,sphere" -r "0.01,0.05,0.1,0.2" -s "$N_SEARCHES" --repeats 1 -a "$FULL_ALGOS_RADIUS" --local-reorder "none,spherical,cylindrical" --num-threads 1 --debug-ranges
+  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.01,0.05,0.1,0.2" -s "$N_SEARCHES" --repeats 1 -a "$FULL_ALGOS_RADIUS" --local-reorder "none,spherical,cylindrical" --num-threads 1 --debug-ranges
 done
