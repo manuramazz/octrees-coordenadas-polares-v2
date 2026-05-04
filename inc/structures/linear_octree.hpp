@@ -664,7 +664,7 @@ protected:
     }
 
 public:    
-    using RangeFn = std::function<std::tuple<const std::vector<size_t>*, PrunedRange>(uint32_t, const Point&, double)>;
+    using RangeFn = std::function<std::tuple<const std::vector<size_t>*, const LeafSortedData* , PrunedRange>(uint32_t, const Point&, double)>;
 
     /**
      * @brief Builds the linear octree given an array of points, also reporting how much time each step takes
@@ -812,7 +812,7 @@ public:
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
-                    const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
@@ -1022,7 +1022,7 @@ public:
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
-                    const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
@@ -1033,9 +1033,8 @@ public:
                             loopWatcher.start();
                         }
                         for (size_t i = range.iMin; i < range.iMax; ++i) {
-                            const size_t pointIndex = startIndex + (*perm)[i];
-                            if (k.isInside(points[pointIndex])) {
-                                ptsInside.push_back(pointIndex);
+                            if (k.isInside(sortedLeafPoints->points[i])) {
+                                ptsInside.push_back(sortedLeafPoints->globalIdxs[i]);
                             }
                         }
                         if (mainOptions.debugLeavesTime) {
@@ -1047,9 +1046,9 @@ public:
                                 loopWatcher.start();
                             }
                             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                                const size_t pointIndex = startIndex + (*perm)[i];
-                                if (k.isInside(points[pointIndex]))
-                                    ptsInside.push_back(pointIndex);
+                                if (k.isInside(sortedLeafPoints->points[i])){
+                                    ptsInside.push_back(sortedLeafPoints->globalIdxs[i]);
+                                }
                             }
                             if (mainOptions.debugLeavesTime) {
                                 loopWatcher.stop();
@@ -1128,7 +1127,7 @@ public:
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
-                    const auto [perm, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();

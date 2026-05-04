@@ -42,6 +42,73 @@ public:
     std::vector<LeafPermutations> leafPerms;
     std::vector<LeafKeys> leafKeys;
 
+    /**
+    ** REORDENACIÓN FÍSICA (duplicación del vector de puntos)
+    **/
+
+    std::vector<LeafSortedData> leafSortedData;
+
+    // ============================================================
+    // Función de construcción de vectores reordenados (duplicación)
+    // ============================================================
+    void buildSortedData(
+        Octree_t& octree,
+        Container& points,
+        OrderType order,
+        ReorderMode mode)
+    {
+        if (mode == ReorderMode::None)
+            return;
+
+        const size_t numLeaves = octree.getNumLeaves();
+        leafSortedData.resize(numLeaves);
+
+        #pragma omp parallel for schedule(dynamic)
+        for (size_t leaf = 0; leaf < numLeaves; ++leaf)
+        {
+            const auto& perm = leafPerms[leaf].perms[static_cast<int>(order)];
+            const size_t count = perm.size();
+
+            if (count == 0) continue;
+
+            leafSortedData[leaf].points.resize(count);
+            leafSortedData[leaf].globalIdxs.resize(count);
+
+            size_t begin = 0;
+            std::vector<size_t> leafPointsLocal;
+
+            if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                leafPointsLocal = octree.getLeafPoints(leaf);
+            } else {
+                auto [b, e] = octree.getLeafRange(leaf);
+                begin = b;
+            }
+
+            for (size_t i = 0; i < count; ++i) {
+                size_t globalIdx;
+                if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                    globalIdx = leafPointsLocal[perm[i]];
+                } else {
+                    globalIdx = begin + perm[i];
+                }
+
+                leafSortedData[leaf].globalIdxs[i] = globalIdx;
+
+                if constexpr (std::is_same_v<Container, PointsSoA>) {
+                    leafSortedData[leaf].points[i] = Point(
+                        points.dataX()[globalIdx],
+                        points.dataY()[globalIdx],
+                        points.dataZ()[globalIdx]);
+                } else {
+                    leafSortedData[leaf].points[i] = points[globalIdx];
+                }
+            }
+        }
+    }
+
+    const LeafSortedData& getSortedLeafData(size_t leaf) const {
+        return leafSortedData[leaf];
+    }  
 
     // ============================================================
     // Función de construcción de permutaciones (NO reordena datos)
@@ -175,251 +242,6 @@ public:
 
     const std::vector<double>& getLeafKeys(size_t leaf, OrderType type) const {
          return leafKeys[leaf].keys[static_cast<int>(type)];
-    }
-
-
-    // ============================================================
-    // Variante de debug para verificar OpenMP y permutaciones
-    // ============================================================
-
-    void buildLeafPermutationsDebug(
-        Octree_t& octree,
-        Container& points,
-        ReorderMode mode,
-        bool printPreview = false)
-    {
-        auto debugLog = [](const std::string& msg) {
-            #pragma omp critical(octree_reordered_debug_log)
-            {
-                std::cout << msg << '\n';
-            }
-        };
-
-        auto previewPermutation = [&](const std::vector<size_t>& perm, const std::vector<double>& keys, size_t maxItems) {
-            std::ostringstream oss;
-            const size_t limit = std::min(maxItems, perm.size());
-            for (size_t i = 0; i < limit; ++i) {
-                if (i > 0)
-                    oss << ',';
-                oss << perm[i] << '(' << std::fixed << std::setprecision(4) << keys[perm[i]] << ')';
-            }
-            if (perm.size() > limit)
-                oss << ",...";
-            return oss.str();
-        };
-
-        auto isValidPermutation = [](const std::vector<size_t>& perm, size_t expectedSize) {
-            if (perm.size() != expectedSize)
-                return false;
-
-            std::vector<size_t> sortedPerm = perm;
-            std::sort(sortedPerm.begin(), sortedPerm.end());
-
-            for (size_t i = 0; i < expectedSize; ++i) {
-                if (sortedPerm[i] != i)
-                    return false;
-            }
-            return true;
-        };
-
-        if (mode == ReorderMode::None) {
-            debugLog("[OctreeReordered::Debug] mode=None, no se construyen permutaciones.");
-            return;
-        }
-
-        const size_t numLeaves = octree.getNumLeaves();
-        leafPerms.resize(numLeaves);
-
-        {
-            std::ostringstream oss;
-            oss << "[OctreeReordered::Debug] start leaves=" << numLeaves
-                << " max_threads=" << omp_get_max_threads();
-            debugLog(oss.str());
-        }
-
-        #pragma omp parallel for schedule(dynamic)
-        for (size_t leaf = 0; leaf < numLeaves; ++leaf)
-        {
-            const int tid = omp_get_thread_num();
-            size_t count = 0;
-            std::vector<size_t> leafPoints;
-            size_t begin = 0;
-            size_t end = 0;
-
-            if constexpr (requires { octree.getLeafPoints(leaf); }) {
-                leafPoints = octree.getLeafPoints(leaf);
-                count = leafPoints.size();
-            } else {
-                auto range = octree.getLeafRange(leaf);
-                begin = range.first;
-                end   = range.second;
-                count = end - begin;
-            }
-
-            const bool logLeaf = (leaf < 20 && count > 0); // loguear solo las primeras hojas con puntos para no saturar la salida
-
-            if (logLeaf) {
-                std::ostringstream oss;
-                oss << "[OctreeReordered::Debug] leaf=" << leaf
-                    << " tid=" << tid
-                    << " range=[" << begin << ',' << end << ")"
-                    << " count=" << count;
-                debugLog(oss.str());
-            }
-
-            const auto& center = octree.getLeafCenter(leaf);
-
-            std::array<std::vector<double>, 2> keys;
-            for (int k = 0; k < 2; ++k)
-                keys[k].resize(count);
-
-            for (int k = 0; k < 3; ++k) {
-                leafPerms[leaf].perms[k].resize(count);
-                std::iota(leafPerms[leaf].perms[k].begin(),
-                          leafPerms[leaf].perms[k].end(), 0);
-            }
-
-            std::vector<double> dxVals(count);
-            std::vector<double> dyVals(count);
-            std::vector<double> rxyVals(count);
-
-            for (size_t i = 0; i < count; ++i)
-            {
-                size_t idx = begin + i;
-                if constexpr (requires { octree.getLeafPoints(leaf); }) {
-                    idx = leafPoints[i];
-                }
-
-                double dx, dy, dz;
-                if constexpr (std::is_same_v<Container, PointsSoA>) {
-                    dx = points.dataX()[idx] - center.getX();
-                    dy = points.dataY()[idx] - center.getY();
-                    dz = points.dataZ()[idx] - center.getZ();
-                } else {
-                    dx = points[idx].getX() - center.getX();
-                    dy = points[idx].getY() - center.getY();
-                    dz = points[idx].getZ() - center.getZ();
-                }
-
-                const double rxy = std::sqrt(dx * dx + dy * dy);
-                dxVals[i] = dx;
-                dyVals[i] = dy;
-                rxyVals[i] = rxy;
-
-                if (mode == ReorderMode::Cylindrical)
-                {
-                    keys[0][i] = rxy;
-                    keys[1][i] = dz;
-                }
-                else
-                {
-                    const double r = std::sqrt(rxy * rxy + dz * dz);
-                    const double theta = (r > 0.0) ? std::acos(std::clamp(dz / r, -1.0, 1.0)) : 0.0;
-                    keys[0][i] = theta;
-                    keys[1][i] = r;
-                }
-            }
-
-            auto angleLess = [&](size_t i, size_t j) {
-                if (i == j)
-                    return false;
-
-                const double x1 = dxVals[i];
-                const double y1 = dyVals[i];
-                const double x2 = dxVals[j];
-                const double y2 = dyVals[j];
-
-                const bool origin1 = (x1 == 0.0 && y1 == 0.0);
-                const bool origin2 = (x2 == 0.0 && y2 == 0.0);
-
-                if (origin1 != origin2)
-                    return origin1;
-
-                if (origin1)
-                    return i < j;
-
-                const bool upper1 = (y1 > 0.0) || (y1 == 0.0 && x1 >= 0.0);
-                const bool upper2 = (y2 > 0.0) || (y2 == 0.0 && x2 >= 0.0);
-
-                if (upper1 != upper2)
-                    return upper1;
-
-                const double cross = x1 * y2 - y1 * x2;
-                if (cross != 0.0)
-                    return cross > 0.0;
-
-                if (rxyVals[i] != rxyVals[j])
-                    return rxyVals[i] < rxyVals[j];
-
-                return i < j;
-            };
-
-            auto& permK0 = leafPerms[leaf].perms[static_cast<int>(OrderType::K0)];
-            std::sort(permK0.begin(), permK0.end(), angleLess);
-
-            if (logLeaf) {
-                const bool k0Sorted = std::is_sorted(permK0.begin(), permK0.end(), angleLess);
-                const bool k0Valid = isValidPermutation(permK0, count);
-                std::ostringstream oss;
-                oss << "[OctreeReordered::Debug] leaf=" << leaf
-                    << " tid=" << tid
-                    << " K0 sorted=" << (k0Sorted ? "OK" : "FAIL")
-                    << " valid_perm=" << (k0Valid ? "OK" : "FAIL");
-                if (printPreview) {
-                    // Recalcular atan2 solo para visualización en debug
-                    std::vector<double> k0Keys(count);
-                    for (size_t i = 0; i < count; ++i)
-                        k0Keys[i] = std::atan2(dyVals[i], dxVals[i]);
-
-                    oss << " preview=" << previewPermutation(permK0, k0Keys, 10);
-                }
-                debugLog(oss.str());
-            }
-
-            for (int k = 0; k < 2; ++k)
-            {
-                auto& perm = leafPerms[leaf].perms[k + 1];
-                std::sort(
-                    perm.begin(),
-                    perm.end(),
-                    [&](size_t a, size_t b) {
-                        return keys[k][a] < keys[k][b];
-                    });
-
-                if (logLeaf) {
-                    const bool sorted = std::is_sorted(
-                        perm.begin(),
-                        perm.end(),
-                        [&](size_t a, size_t b) {
-                            return keys[k][a] < keys[k][b];
-                        });
-                    const bool valid = isValidPermutation(perm, count);
-
-                    std::ostringstream oss;
-                    oss << "[OctreeReordered::Debug] leaf=" << leaf
-                        << " tid=" << tid
-                        << " K" << (k + 1)
-                        << " sorted=" << (sorted ? "OK" : "FAIL")
-                        << " valid_perm=" << (valid ? "OK" : "FAIL");
-                    if (printPreview)
-                        oss << " preview=" << previewPermutation(perm, keys[k], 10);
-                    debugLog(oss.str());
-                }
-            }
-        }
-
-        debugLog("[OctreeReordered::Debug] finished");
-    }
-
-        // Prints the (complete) range of points in a leaf, for debugging purposes
-    void logLeafRange(uint32_t leafIndex, size_t begin, size_t end) const {
-        std::cout << "Logging leaf range for leaf " << leafIndex << ": [" << begin << ", " << end << ")\n";
-        std::filesystem::path leafRangeLogPath = mainOptions.outputDirName / "leaf_range_log.log";
-        std::ofstream leafRangeLogFile(leafRangeLogPath, std::ios_base::app);
-        if (leafRangeLogFile.is_open()) {
-            leafRangeLogFile << "Leaf " << leafIndex << ": [" << begin << ", " << end << ")\n";
-            leafRangeLogFile.close();
-        }
     }
 
 };

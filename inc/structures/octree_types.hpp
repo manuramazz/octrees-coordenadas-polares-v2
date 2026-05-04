@@ -7,6 +7,10 @@ enum class OrderType {
     K2 = 2  // orden por clave 2 (z para cilíndricas, r para esféricas)
 };
 
+struct LeafSortedData {
+    std::vector<Point> points;
+    std::vector<size_t> globalIdxs; // Índices globales de los puntos en el orden original
+};
 
 struct PrunedRange {
     size_t iMin  = 0;

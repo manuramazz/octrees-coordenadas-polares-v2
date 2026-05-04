@@ -12,12 +12,14 @@
 #include "structures/unibn_octree.hpp"
 #include "structures/octree_reordered.hpp"
 #include "structures/octree_range_selector.hpp"
+#include "structures/octree_types.hpp"
 
 #include "benchmarking.hpp"
 #include "papi_events.hpp"
 #include "time_watcher.hpp"
 #include "search_set.hpp"
 #include "main_options.hpp"
+
 
 #ifdef HAVE_PICOTREE
 #include "structures/picotree_wrappers.hpp"
@@ -505,7 +507,8 @@ class NeighborsBenchmark {
                     PrunedRange range = bestRange(leafIndex, query, radius, kernel,
                                                 oct, reordered, mode, false);
                     const auto& perm = reordered.getLeafPermutation(leafIndex, range.order);
-                    return std::make_tuple(&perm, range);
+                    const auto& sortedLeafPoints = reordered.getSortedLeafData(leafIndex);
+                    return std::make_tuple(&perm, &sortedLeafPoints, range);
                 };
             }
 
@@ -761,6 +764,7 @@ class NeighborsBenchmark {
                         // Measure time taken by reordering to include it in the logs
                         auto startTime = std::chrono::high_resolution_clock::now();
                         reordered.buildLeafPermutations(oct, points, mode);
+                        reordered.buildSortedData(oct, points, OrderType::K0, mode);
                         auto endTime = std::chrono::high_resolution_clock::now();
                         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
                         std::cout << "[LOG] Reordering completed in " << duration << " ms.\n";

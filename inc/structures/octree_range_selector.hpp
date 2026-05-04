@@ -142,7 +142,7 @@ PrunedRange computeRange(
 }
 
 template<typename Octree_t, typename Reordered_t>
-PrunedRange bestRange(
+PrunedRange bestRangeAntiguo(
     size_t leaf,
     const Point& query,
     double radius,
@@ -169,6 +169,31 @@ PrunedRange bestRange(
     if (logging)
         std::cout << "Leaf " << leaf << ": best order=" << static_cast<int>(best.order)
                   << " count=" << best.count() << " / " << count << '\n';
+
+    return best;
+}
+
+template<typename Octree_t, typename Reordered_t>
+PrunedRange bestRange(
+    size_t leaf,
+    const Point& query,
+    double radius,
+    Kernel_t kernel,
+    const Octree_t& octree,
+    const Reordered_t& reordered,
+    ReorderMode mode,
+    bool logging = false)
+{
+    const size_t count = reordered.getLeafPermutation(leaf, OrderType::K0).size();
+    const Point& center = octree.getLeafCenter(leaf);
+    const auto geo = detail::LeafQueryGeometry::compute(query, center, radius, kernel);
+
+
+    PrunedRange best = computeRange(leaf, kernel, OrderType::K0, octree, count, reordered, mode, geo);
+  
+    if (mainOptions.debugRanges) {
+        printLog(std::to_string(leaf) + "," + std::string(kernelToString(kernel)) +","+ std::string(localReorderTypeToString(mode)) + "," + std::to_string(radius) + "," + std::to_string(best.count()) + "," + std::to_string(count) + "," +std::to_string(static_cast<int>(best.order)));
+    }
 
     return best;
 }
