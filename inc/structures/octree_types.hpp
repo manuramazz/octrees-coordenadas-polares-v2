@@ -12,6 +12,29 @@ struct LeafSortedData {
     std::vector<size_t> globalIdxs; // Índices globales de los puntos en el orden original
 };
 
+struct SortedDataFlat {
+    std::vector<Point>  allPoints;     // todos los puntos de todas las hojas, contiguos
+    std::vector<size_t> allGlobalIdx;  // todos los índices globales, contiguos
+    std::vector<size_t> leafOffsets;   // leafOffsets[leaf] = inicio en allPoints
+                                       // leafOffsets[leaf+1] - leafOffsets[leaf] = count de la hoja
+
+    // Acceso a puntos de una hoja
+    [[nodiscard]] const Point* leafPoints(size_t leaf) const {
+        return allPoints.data() + leafOffsets[leaf];
+    }
+
+    // Acceso a índices globales de una hoja
+    [[nodiscard]] const size_t* leafGlobalIdx(size_t leaf) const {
+        return allGlobalIdx.data() + leafOffsets[leaf];
+    }
+
+    // Número de puntos de una hoja
+    [[nodiscard]] size_t leafCount(size_t leaf) const {
+        return leafOffsets[leaf + 1] - leafOffsets[leaf];
+    }
+};
+
+
 struct PrunedRange {
     size_t iMin  = 0;
     size_t iMax  = 0;

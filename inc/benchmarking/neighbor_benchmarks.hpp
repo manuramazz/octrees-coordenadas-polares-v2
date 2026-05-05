@@ -506,9 +506,7 @@ class NeighborsBenchmark {
                 getRange = [&](uint32_t leafIndex, const Point& query, double radius) {
                     PrunedRange range = bestRange(leafIndex, query, radius, kernel,
                                                 oct, reordered, mode, false);
-                    const auto& perm = reordered.getLeafPermutation(leafIndex, range.order);
-                    const auto& sortedLeafPoints = reordered.getSortedLeafData(leafIndex);
-                    return std::make_tuple(&perm, &sortedLeafPoints, range);
+                    return range;
                 };
             }
 
@@ -531,9 +529,10 @@ class NeighborsBenchmark {
                 auto neighborsSearchPrune = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
+                    const SortedDataFlat* sortedFlatPtr = (mode != ReorderMode::None) ? &reordered.getSortedFlat() : nullptr;
                     #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                         for(size_t i = 0; i<searchSet.numSearches; i++) {
-                            auto result = oct.template neighborsPrune<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                            auto result = oct.template neighborsPrune<kernel>(points[searchIndexes[i]], radius, getRange, mode, sortedFlatPtr);
                             averageResultSize += result.size();
                         }
                     averageResultSize /= searchSet.numSearches;
@@ -764,7 +763,8 @@ class NeighborsBenchmark {
                         // Measure time taken by reordering to include it in the logs
                         auto startTime = std::chrono::high_resolution_clock::now();
                         reordered.buildLeafPermutations(oct, points, mode);
-                        reordered.buildSortedData(oct, points, OrderType::K0, mode);
+                        //reordered.buildSortedData(oct, points, OrderType::K0, mode);
+                        reordered.buildSortedDataFlat(oct, points, OrderType::K0, mode);
                         auto endTime = std::chrono::high_resolution_clock::now();
                         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
                         std::cout << "[LOG] Reordering completed in " << duration << " ms.\n";

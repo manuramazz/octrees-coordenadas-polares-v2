@@ -110,6 +110,83 @@ public:
         return leafSortedData[leaf];
     }  
 
+
+    // ============================================================
+    // Función de construcción de array plano reordenado (duplicación)
+    // ============================================================
+    SortedDataFlat sortedFlat;
+
+    void buildSortedDataFlat(
+        Octree_t& octree,
+        Container& points,
+        OrderType order,
+        ReorderMode mode)
+    {
+        if (mode == ReorderMode::None)
+            return;
+
+        const size_t numLeaves = octree.getNumLeaves();
+
+        // Paso 1 — calcular offsets (necesita saber el count de cada hoja)
+        sortedFlat.leafOffsets.resize(numLeaves + 1);
+        sortedFlat.leafOffsets[0] = 0;
+
+        #pragma omp parallel for schedule(dynamic)
+        for (size_t leaf = 0; leaf < numLeaves; ++leaf) {
+            const size_t count = leafPerms[leaf].perms[static_cast<int>(order)].size();
+            sortedFlat.leafOffsets[leaf + 1] = sortedFlat.leafOffsets[leaf] + count;
+        }
+
+        const size_t totalPoints = sortedFlat.leafOffsets[numLeaves];
+        sortedFlat.allPoints.resize(totalPoints);
+        sortedFlat.allGlobalIdx.resize(totalPoints);
+
+        // Paso 2 — rellenar en paralelo (cada hoja escribe en su propio rango, sin solapamiento)
+        #pragma omp parallel for schedule(dynamic)
+        for (size_t leaf = 0; leaf < numLeaves; ++leaf)
+        {
+            const auto& perm = leafPerms[leaf].perms[static_cast<int>(order)];
+            const size_t count = perm.size();
+            const size_t offset = sortedFlat.leafOffsets[leaf];
+
+            if (count == 0) continue;
+
+            size_t begin = 0;
+            std::vector<size_t> leafPointsLocal;
+
+            if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                leafPointsLocal = octree.getLeafPoints(leaf);
+            } else {
+                auto [b, e] = octree.getLeafRange(leaf);
+                begin = b;
+            }
+
+            for (size_t i = 0; i < count; ++i) {
+                size_t globalIdx;
+                if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                    globalIdx = leafPointsLocal[perm[i]];
+                } else {
+                    globalIdx = begin + perm[i];
+                }
+
+                sortedFlat.allGlobalIdx[offset + i] = globalIdx;
+
+                if constexpr (std::is_same_v<Container, PointsSoA>) {
+                    sortedFlat.allPoints[offset + i] = Point(
+                        points.dataX()[globalIdx],
+                        points.dataY()[globalIdx],
+                        points.dataZ()[globalIdx]);
+                } else {
+                    sortedFlat.allPoints[offset + i] = points[globalIdx];
+                }
+            }
+        }
+    }
+
+    const SortedDataFlat& getSortedFlat() const {
+        return sortedFlat;
+    }
+
     // ============================================================
     // Función de construcción de permutaciones (NO reordena datos)
     // ============================================================

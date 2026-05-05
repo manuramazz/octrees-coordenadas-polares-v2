@@ -664,7 +664,7 @@ protected:
     }
 
 public:    
-    using RangeFn = std::function<std::tuple<const std::vector<size_t>*, const LeafSortedData* , PrunedRange>(uint32_t, const Point&, double)>;
+    using RangeFn = std::function<PrunedRange(uint32_t, const Point&, double)>;
 
     /**
      * @brief Builds the linear octree given an array of points, also reporting how much time each step takes
@@ -805,57 +805,57 @@ public:
             TimeWatcher getRangeWatcher;
             TimeWatcher loopWatcher;
             if (getRange) {
-                assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
-                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-                if (leafIndex >= 0) {
-                    assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsStruct");
-                    if (mainOptions.debugLeavesTime) {
-                        getRangeWatcher.start();
-                    }
-                    const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
-                    if (mainOptions.debugLeavesTime) {
-                        getRangeWatcher.stop();
-                        accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
-                    }
-                    if (perm != nullptr) {
-                        if (mainOptions.debugLeavesTime) {
-                            loopWatcher.start();
-                        }
-                        for (size_t i = range.iMin; i < range.iMax; ++i) {
-                            const size_t pointIndex = startIndex + (*perm)[i];
-                            if (!k.isInside(points[pointIndex])) {
-                                if (rangeStart < i)
-                                    result.addRange(rangeStart, i);
-                                rangeStart = i + 1;
-                            }
-                        }
-                        if (mainOptions.debugLeavesTime) {
-                            loopWatcher.stop();
-                            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                        }
+                // assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
+                // const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+                // if (leafIndex >= 0) {
+                //     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsStruct");
+                //     if (mainOptions.debugLeavesTime) {
+                //         getRangeWatcher.start();
+                //     }
+                //     const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                //     if (mainOptions.debugLeavesTime) {
+                //         getRangeWatcher.stop();
+                //         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
+                //     }
+                //     if (perm != nullptr) {
+                //         if (mainOptions.debugLeavesTime) {
+                //             loopWatcher.start();
+                //         }
+                //         for (size_t i = range.iMin; i < range.iMax; ++i) {
+                //             const size_t pointIndex = startIndex + (*perm)[i];
+                //             if (!k.isInside(points[pointIndex])) {
+                //                 if (rangeStart < i)
+                //                     result.addRange(rangeStart, i);
+                //                 rangeStart = i + 1;
+                //             }
+                //         }
+                //         if (mainOptions.debugLeavesTime) {
+                //             loopWatcher.stop();
+                //             accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                //         }
 
-                        if (range.hasSecond) {
-                            if (rangeStart < range.iMax)
-                                result.addRange(rangeStart, range.iMax);
-                            rangeStart = range.iMin2;
-                            if (mainOptions.debugLeavesTime) {
-                                loopWatcher.start();
-                            }
-                            for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                                const size_t pointIndex = startIndex + (*perm)[i];
-                                if (!k.isInside(points[pointIndex])){
-                                    if (rangeStart < i)
-                                        result.addRange(rangeStart, i);
-                                    rangeStart = i + 1;
-                                }
-                            }
-                            if (mainOptions.debugLeavesTime) {
-                                loopWatcher.stop();
-                                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                            }
-                        }
-                    }
-                }
+                //         if (range.hasSecond) {
+                //             if (rangeStart < range.iMax)
+                //                 result.addRange(rangeStart, range.iMax);
+                //             rangeStart = range.iMin2;
+                //             if (mainOptions.debugLeavesTime) {
+                //                 loopWatcher.start();
+                //             }
+                //             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
+                //                 const size_t pointIndex = startIndex + (*perm)[i];
+                //                 if (!k.isInside(points[pointIndex])){
+                //                     if (rangeStart < i)
+                //                         result.addRange(rangeStart, i);
+                //                     rangeStart = i + 1;
+                //                 }
+                //             }
+                //             if (mainOptions.debugLeavesTime) {
+                //                 loopWatcher.stop();
+                //                 accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                //             }
+                //         }
+                //     }
+                // }
             }
             else{
                 if (mainOptions.debugLeavesTime) {
@@ -969,7 +969,7 @@ public:
      * @return Points inside the given kernel type.
      */
     template<typename Kernel>
-    [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+    [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None, const SortedDataFlat* sortedFlat = nullptr) const {
         std::vector<size_t> ptsInside;
         const double searchRadius = k.radii().getX();
         auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
@@ -1013,7 +1013,7 @@ public:
             TimeWatcher loopWatcher;
             // If getRange provided -> uses polar coords optimization
             // Only checks points inside range returned by bestRange (from octree_range_selector)
-            if (getRange) {
+            if (getRange && sortedFlat) {
                 assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 //std::cout << "Leaf n "<< leafIndex << ": [" << startIndex << ", " << endIndex << ")\n";
@@ -1022,41 +1022,43 @@ public:
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
-                    const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
                     }
-                    if (perm != nullptr) {
-                        //log de perm;
+
+                    //log de perm;
+                    if (mainOptions.debugLeavesTime) {
+                        loopWatcher.start();
+                    }
+                    const Point*  leafPts = sortedFlat->leafPoints(leafIndex);   // puntero directo, sin heap
+                    const size_t* leafIdx = sortedFlat->leafGlobalIdx(leafIndex);
+                    for (size_t i = range.iMin; i < range.iMax; ++i) {
+                        if (k.isInside(leafPts[i])){
+                            ptsInside.push_back(leafIdx[i]);
+                        }
+                    }
+                    if (mainOptions.debugLeavesTime) {
+                        loopWatcher.stop();
+                        accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                    }
+                    if (range.hasSecond) {
                         if (mainOptions.debugLeavesTime) {
                             loopWatcher.start();
                         }
-                        for (size_t i = range.iMin; i < range.iMax; ++i) {
-                            if (k.isInside(sortedLeafPoints->points[i])) {
-                                ptsInside.push_back(sortedLeafPoints->globalIdxs[i]);
+                        for (size_t i = range.iMin2; i < range.iMax2; ++i) {
+                            if (k.isInside(leafPts[i])){
+                                ptsInside.push_back(leafIdx[i]);
                             }
                         }
                         if (mainOptions.debugLeavesTime) {
                             loopWatcher.stop();
                             accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                         }
-                        if (range.hasSecond) {
-                            if (mainOptions.debugLeavesTime) {
-                                loopWatcher.start();
-                            }
-                            for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                                if (k.isInside(sortedLeafPoints->points[i])){
-                                    ptsInside.push_back(sortedLeafPoints->globalIdxs[i]);
-                                }
-                            }
-                            if (mainOptions.debugLeavesTime) {
-                                loopWatcher.stop();
-                                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                            }
-                        }
-                        return;
                     }
+                    return;
+                    
                 }
             }
 
@@ -1120,49 +1122,49 @@ public:
             TimeWatcher loopWatcher;
 
             if (getRange) {
-                assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
-                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-                if (leafIndex >= 0) {
-                    assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighbors");
-                    if (mainOptions.debugLeavesTime) {
-                        getRangeWatcher.start();
-                    }
-                    const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
-                    if (mainOptions.debugLeavesTime) {
-                        getRangeWatcher.stop();
-                        accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
-                    }
-                    if (perm != nullptr) {
-                        if (mainOptions.debugLeavesTime) {
-                            loopWatcher.start();
-                        }
-                        for (size_t i = range.iMin; i < range.iMax; ++i) {
-                            const size_t pointIndex = startIndex + (*perm)[i];
-                            if (k.isInside(points[pointIndex])) {
-                                ptsInside.push_back(pointIndex);
-                            }
-                        }
-                        if (mainOptions.debugLeavesTime) {
-                            loopWatcher.stop();
-                            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                        }
-                        if (range.hasSecond) {
-                            if (mainOptions.debugLeavesTime) {
-                                loopWatcher.start();
-                            }
-                            for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                                const size_t pointIndex = startIndex + (*perm)[i];
-                                if (k.isInside(points[pointIndex]))
-                                    ptsInside.push_back(pointIndex);
-                            }
-                            if (mainOptions.debugLeavesTime) {
-                                loopWatcher.stop();
-                                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                            }
-                        }
-                        return;
-                    }
-                }
+                // assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
+                // const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+                // if (leafIndex >= 0) {
+                //     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighbors");
+                //     if (mainOptions.debugLeavesTime) {
+                //         getRangeWatcher.start();
+                //     }
+                //     const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                //     if (mainOptions.debugLeavesTime) {
+                //         getRangeWatcher.stop();
+                //         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
+                //     }
+                //     if (perm != nullptr) {
+                //         if (mainOptions.debugLeavesTime) {
+                //             loopWatcher.start();
+                //         }
+                //         for (size_t i = range.iMin; i < range.iMax; ++i) {
+                //             const size_t pointIndex = startIndex + (*perm)[i];
+                //             if (k.isInside(points[pointIndex])) {
+                //                 ptsInside.push_back(pointIndex);
+                //             }
+                //         }
+                //         if (mainOptions.debugLeavesTime) {
+                //             loopWatcher.stop();
+                //             accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                //         }
+                //         if (range.hasSecond) {
+                //             if (mainOptions.debugLeavesTime) {
+                //                 loopWatcher.start();
+                //             }
+                //             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
+                //                 const size_t pointIndex = startIndex + (*perm)[i];
+                //                 if (k.isInside(points[pointIndex]))
+                //                     ptsInside.push_back(pointIndex);
+                //             }
+                //             if (mainOptions.debugLeavesTime) {
+                //                 loopWatcher.stop();
+                //                 accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                //             }
+                //         }
+                //         return;
+                //     }
+                // }
             }
 
             // Normal case, check all points in the leaf
@@ -1451,15 +1453,15 @@ public:
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::square>
-    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None, const SortedDataFlat* sortedFlat = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-        return neighborsPrune(kernel, getRange, mode);
+        return neighborsPrune(kernel, getRange, mode, sortedFlat);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
-    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None, const SortedDataFlat* sortedFlat = nullptr) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-        return neighborsPrune(kernel, getRange, mode);
+        return neighborsPrune(kernel, getRange, mode, sortedFlat);
 	}
 
     template<Kernel_t kernel_type = Kernel_t::square>
