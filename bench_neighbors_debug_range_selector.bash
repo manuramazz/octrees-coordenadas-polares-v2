@@ -1,5 +1,5 @@
 # setup
-FOLDER="outv2.1"
+FOLDER="outv2.2-ranges"
 set -e
 mkdir -p "$FOLDER"
 

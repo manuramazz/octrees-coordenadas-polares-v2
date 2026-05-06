@@ -452,6 +452,9 @@ class Octree
 		[[nodiscard]] const std::vector<size_t>& getLeafPoints(size_t i) const {
 			return leaves_[i]->points_;
 		}
+		[[nodiscard]] Vector getLeafHalfSizeByLeafIndex(size_t i) const {
+			return Vector(0,0,0);
+		}
 
 
 

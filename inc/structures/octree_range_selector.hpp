@@ -50,7 +50,7 @@ inline std::ofstream& getRangeSelectorLog() {
 inline void printLog(const std::string& message) {
     auto& f = getRangeSelectorLog();
     if(!headers) {
-        f << "leaf,kernel,mode,radius,count,total,key\n";
+        f << "leaf,kernel,mode,radius,L,count,total,key\n";
         headers = true;
     }
     if (f.is_open())
@@ -164,12 +164,8 @@ PrunedRange bestRangeAntiguo(
             best = r;
     }
     if (mainOptions.debugRanges) {
-        printLog(std::to_string(leaf) + "," + std::string(kernelToString(kernel)) +","+ std::string(localReorderTypeToString(mode)) + "," + std::to_string(radius) + "," + std::to_string(best.count()) + "," + std::to_string(count) + "," +std::to_string(static_cast<int>(best.order)));
+        printLog(std::to_string(leaf) + "," + std::string(kernelToString(kernel)) +","+ std::string(localReorderTypeToString(mode)) + "," + std::to_string(radius) + "," + std::to_string(octree.getLeafHalfSizeByLeafIndex(leaf)) + "," + std::to_string(best.count()) + "," + std::to_string(count) + "," +std::to_string(static_cast<int>(best.order)));
     }
-    if (logging)
-        std::cout << "Leaf " << leaf << ": best order=" << static_cast<int>(best.order)
-                  << " count=" << best.count() << " / " << count << '\n';
-
     return best;
 }
 
@@ -184,7 +180,12 @@ PrunedRange bestRange(
     ReorderMode mode,
     bool logging = false)
 {
-    const size_t count = reordered.getLeafPermutation(leaf, OrderType::K0).size();
+    const auto leafOffsets = reordered.getSortedFlat().leafOffsets;
+    const size_t count = leafOffsets[leaf + 1] - leafOffsets[leaf];
+    if (count <=1 ){
+        PrunedRange full{0, count, 0,0,false, OrderType::K0};
+        return full;
+    }
     const Point& center = octree.getLeafCenter(leaf);
     const auto geo = detail::LeafQueryGeometry::compute(query, center, radius, kernel);
 
@@ -192,7 +193,7 @@ PrunedRange bestRange(
     PrunedRange best = computeRange(leaf, kernel, OrderType::K0, octree, count, reordered, mode, geo);
   
     if (mainOptions.debugRanges) {
-        printLog(std::to_string(leaf) + "," + std::string(kernelToString(kernel)) +","+ std::string(localReorderTypeToString(mode)) + "," + std::to_string(radius) + "," + std::to_string(best.count()) + "," + std::to_string(count) + "," +std::to_string(static_cast<int>(best.order)));
+        printLog(std::to_string(leaf) + "," + std::string(kernelToString(kernel)) +","+ std::string(localReorderTypeToString(mode)) + "," + std::to_string(radius) + "," + std::to_string(octree.getLeafHalfSizeByLeafIndex(leaf).getX()) + "," + std::to_string(best.count()) + "," + std::to_string(count) + "," +std::to_string(static_cast<int>(best.order)));
     }
 
     return best;

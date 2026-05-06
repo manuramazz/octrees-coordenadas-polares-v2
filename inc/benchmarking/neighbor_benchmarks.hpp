@@ -582,14 +582,14 @@ class NeighborsBenchmark {
         void benchmarkPtrOctree(Octree<Container> &oct, std::string_view kernelName, const OctreeReordered<Octree<Container>, Container>& reordered, ReorderMode mode) {
             typename Octree<Container>::RangeFn getRange = nullptr;
             const std::string_view reorderModeStr = localReorderTypeToString(mode);
-            if (mode != ReorderMode::None) {
-                getRange = [&](uint32_t leafIndex, const Point& query, double radius) {
-                    PrunedRange range = bestRange(leafIndex, query, radius, kernel,
-                                                oct, reordered, mode, false);
-                    const auto& perm = reordered.getLeafPermutation(leafIndex, range.order);
-                    return std::make_tuple(&perm, range);
-                };
-            }
+            // if (mode != ReorderMode::None) {
+            //     getRange = [&](uint32_t leafIndex, const Point& query, double radius) {
+            //         PrunedRange range = bestRange(leafIndex, query, radius, kernel,
+            //                                     oct, reordered, mode, false);
+            //         const auto& perm = reordered.getLeafPermutations(leafIndex, range.order);
+            //         return std::make_tuple(&perm, range);
+            //     };
+            // }
 
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS_PTR)) {
                 auto neighborsPtrSearch = [&](double radius) -> size_t {
@@ -763,8 +763,6 @@ class NeighborsBenchmark {
                         // Measure time taken by reordering to include it in the logs
                         auto startTime = std::chrono::high_resolution_clock::now();
                         reordered.buildLeafPermutations(oct, points, mode);
-                        //reordered.buildSortedData(oct, points, OrderType::K0, mode);
-                        reordered.buildSortedDataFlat(oct, points, OrderType::K0, mode);
                         auto endTime = std::chrono::high_resolution_clock::now();
                         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
                         std::cout << "[LOG] Reordering completed in " << duration << " ms.\n";

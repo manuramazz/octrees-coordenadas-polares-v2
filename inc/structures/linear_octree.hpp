@@ -12,6 +12,7 @@
 #include <tuple>
 #include <type_traits>
 #include <sstream>
+#include <algorithm>
 #include "util.hpp"
 #include "benchmarking/build_log.hpp"
 #include "benchmarking/time_watcher.hpp"
@@ -135,6 +136,8 @@ protected:
 
     /// @brief A simple vector containinf the radii of each level in the octree to speed up computations.
     std::vector<Vector> precomputedRadii;
+    /// @brief First node index of every tree level (copied from InternalPart after build)
+    std::vector<size_t> levelRange;
 
     /// @brief Maps a leaf index to the corresponding node index in the sorted internal arrays.
     std::vector<size_t> leafNodeIndex;
@@ -574,6 +577,8 @@ protected:
 
         // Find the LO array
         getLevelRange(inter);
+        // Persist levelRange to allow querying leaf depth/size at runtime
+        this->levelRange = inter.levelRange;
 
         // Clear child offsets
         std::fill(offsets.begin(), offsets.end(), 0);
@@ -1039,23 +1044,16 @@ public:
                             ptsInside.push_back(leafIdx[i]);
                         }
                     }
-                    if (mainOptions.debugLeavesTime) {
-                        loopWatcher.stop();
-                        accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                    }
                     if (range.hasSecond) {
-                        if (mainOptions.debugLeavesTime) {
-                            loopWatcher.start();
-                        }
                         for (size_t i = range.iMin2; i < range.iMax2; ++i) {
                             if (k.isInside(leafPts[i])){
                                 ptsInside.push_back(leafIdx[i]);
                             }
                         }
-                        if (mainOptions.debugLeavesTime) {
-                            loopWatcher.stop();
-                            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                        }
+                    }
+                    if (mainOptions.debugLeavesTime) {
+                        loopWatcher.stop();
+                        accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                     }
                     return;
                     
@@ -1628,6 +1626,29 @@ public:
     Point getLeafCenterByLeafIndex(size_t i) const{
         assert(i < nLeaf && "Leaf index out of bounds");
         return centers[getLeafNodeIndex(i)];
+    }
+
+    /// @brief Returns the depth (level) of a leaf in the tree (0=root)
+    size_t getLeafDepthByLeafIndex(size_t leaf) const {
+        assert(leaf < nLeaf && "Leaf index out of bounds");
+        assert(!levelRange.empty() && "levelRange not initialized");
+        size_t node = getLeafNodeIndex(leaf);
+        auto it = std::upper_bound(levelRange.begin(), levelRange.end(), node);
+        size_t depth = (it == levelRange.begin()) ? 0 : static_cast<size_t>((it - levelRange.begin()) - 1);
+        return depth;
+    }
+
+    /// @brief Returns the half-sizes (radii) of the leaf in physical coordinates (half-lengths per axis)
+    Vector getLeafHalfSizeByLeafIndex(size_t leaf) const {
+        size_t depth = getLeafDepthByLeafIndex(leaf);
+        assert(depth < precomputedRadii.size() && "depth out of bounds for precomputedRadii");
+        return precomputedRadii[depth];
+    }
+
+    /// @brief Returns the full size (extent) of the leaf in physical coordinates (size per axis)
+    Vector getLeafSizeByLeafIndex(size_t leaf) const {
+        Vector half = getLeafHalfSizeByLeafIndex(leaf);
+        return Vector(half.getX() * 2.0, half.getY() * 2.0, half.getZ() * 2.0);
     }
 
     /// @brief Backward-compatible leaf range getter.

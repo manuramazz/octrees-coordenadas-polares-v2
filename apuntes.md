@@ -11,3 +11,9 @@ DONE Linear y pointer van igual (las funciones que exponen y la diferenciación 
 - intersecar rangos de los 3 métodos
 - ¿hacer vectores de puntos en vez de perms para mantener localidad caché? -> mandatory probarlo porque ahora mismo aún con la poda el tiempo de bucle es mayor
 - comentar tamaño hojas
+
+Añadir a las gráficas: 
+- relación L-R
+- tamaño de las hojas
+
+Luego hacer experimento modificando los parámetros hablados

@@ -20,18 +20,6 @@ template<typename Octree_t, typename Container>
 class OctreeReordered {
 public:
 
-    /*Tengo que hacer 3 arrays de punteros -> angulo phi, angulo theta, r para esféricas y ángulo phi, r, z?? para cilíndricas
-    hago las tres reordenaciones en la misma función para cada hoja
-
-    Luego en el proceso de búsqueda -> si se elimina o se incluye por completo no hago nada -> si se incluye parcialmente -> 
-    tengo que hacer los cálculos para ver que clave elimina más volumen de la hoja -> uso esa reordenación para eliminar/incluir puntos de la hoja.
-    */
-    /// TODO: 
-    // optimizar la función de cálculo de claves para cada punto (precomputar dx, dy, dz, rxy, etc)
-    /*TODO: OPTIMIZACIONES PARA LUEGO: usar float en vez de double
-    evitar sqrt
-    no calcular acos para todos los puntos*/
-
     struct LeafPermutations {
         std::array<std::vector<size_t>, 3> perms;
     };
@@ -39,77 +27,8 @@ public:
         std::array<std::vector<double>, 3> keys;
     };
 
-    std::vector<LeafPermutations> leafPerms;
+    
     std::vector<LeafKeys> leafKeys;
-
-    /**
-    ** REORDENACIÓN FÍSICA (duplicación del vector de puntos)
-    **/
-
-    std::vector<LeafSortedData> leafSortedData;
-
-    // ============================================================
-    // Función de construcción de vectores reordenados (duplicación)
-    // ============================================================
-    void buildSortedData(
-        Octree_t& octree,
-        Container& points,
-        OrderType order,
-        ReorderMode mode)
-    {
-        if (mode == ReorderMode::None)
-            return;
-
-        const size_t numLeaves = octree.getNumLeaves();
-        leafSortedData.resize(numLeaves);
-
-        #pragma omp parallel for schedule(dynamic)
-        for (size_t leaf = 0; leaf < numLeaves; ++leaf)
-        {
-            const auto& perm = leafPerms[leaf].perms[static_cast<int>(order)];
-            const size_t count = perm.size();
-
-            if (count == 0) continue;
-
-            leafSortedData[leaf].points.resize(count);
-            leafSortedData[leaf].globalIdxs.resize(count);
-
-            size_t begin = 0;
-            std::vector<size_t> leafPointsLocal;
-
-            if constexpr (requires { octree.getLeafPoints(leaf); }) {
-                leafPointsLocal = octree.getLeafPoints(leaf);
-            } else {
-                auto [b, e] = octree.getLeafRange(leaf);
-                begin = b;
-            }
-
-            for (size_t i = 0; i < count; ++i) {
-                size_t globalIdx;
-                if constexpr (requires { octree.getLeafPoints(leaf); }) {
-                    globalIdx = leafPointsLocal[perm[i]];
-                } else {
-                    globalIdx = begin + perm[i];
-                }
-
-                leafSortedData[leaf].globalIdxs[i] = globalIdx;
-
-                if constexpr (std::is_same_v<Container, PointsSoA>) {
-                    leafSortedData[leaf].points[i] = Point(
-                        points.dataX()[globalIdx],
-                        points.dataY()[globalIdx],
-                        points.dataZ()[globalIdx]);
-                } else {
-                    leafSortedData[leaf].points[i] = points[globalIdx];
-                }
-            }
-        }
-    }
-
-    const LeafSortedData& getSortedLeafData(size_t leaf) const {
-        return leafSortedData[leaf];
-    }  
-
 
     // ============================================================
     // Función de construcción de array plano reordenado (duplicación)
@@ -120,7 +39,8 @@ public:
         Octree_t& octree,
         Container& points,
         OrderType order,
-        ReorderMode mode)
+        ReorderMode mode,
+        std::vector<LeafPermutations>& leafPerms)
     {
         if (mode == ReorderMode::None)
             return;
@@ -200,6 +120,8 @@ public:
             return;
 
         size_t numLeaves = octree.getNumLeaves();
+        std::vector<LeafPermutations> leafPerms;
+
         leafPerms.resize(numLeaves);
         leafKeys.resize(numLeaves);
 
@@ -307,16 +229,12 @@ public:
                 leafKeys[leaf].keys[k] = sortedK;
             }
         }
+        buildSortedDataFlat(octree, points, OrderType::K0, mode, leafPerms);
     }
 
     // ==========================
-    // acceso a permutación
+    // acceso a keys
     // ==========================
-
-    const std::vector<size_t>& getLeafPermutation(size_t leaf, OrderType type) const {
-         return leafPerms[leaf].perms[static_cast<int>(type)];
-    }
-
     const std::vector<double>& getLeafKeys(size_t leaf, OrderType type) const {
          return leafKeys[leaf].keys[static_cast<int>(type)];
     }
