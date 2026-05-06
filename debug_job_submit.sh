@@ -25,7 +25,7 @@ echo "Iniciando benchmark"
 echo "Fecha: $(date)"
 
 bash cesga_compile.sh
-bash bench_neighbors_debug_range_selector.bash
+# bash bench_neighbors_debug_range_selector.bash
 bash bench_neighbors_debug_leaf_points.bash
 
 echo "Benchmark finalizado: $(date)"

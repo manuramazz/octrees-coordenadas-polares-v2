@@ -51,7 +51,6 @@ public:
         sortedFlat.leafOffsets.resize(numLeaves + 1);
         sortedFlat.leafOffsets[0] = 0;
 
-        #pragma omp parallel for schedule(dynamic)
         for (size_t leaf = 0; leaf < numLeaves; ++leaf) {
             const size_t count = leafPerms[leaf].perms[static_cast<int>(order)].size();
             sortedFlat.leafOffsets[leaf + 1] = sortedFlat.leafOffsets[leaf] + count;
@@ -101,6 +100,7 @@ public:
                 }
             }
         }
+        std::cout << "Finished building sorted data flat for order " << static_cast<int>(order) << " with mode " << localReorderTypeToString(mode) << std::endl;
     }
 
     const SortedDataFlat& getSortedFlat() const {

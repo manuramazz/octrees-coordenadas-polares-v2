@@ -1,0 +1,5 @@
+date,octree,point_type,encoder,npoints,operation,kernel,radius,reorder,num_searches,sequential_searches,repeats,accumulated,mean,median,stdev,used_warmup,warmup_time,avg_result_size,tolerance_percentage,openmp_threads,openmp_schedule
+2026-05-06-19:36:03,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,sphere,2,none,1000,random,3,0.451198,0.150399,0.15337,0.0055957,1,0.146789,32989,0,16,dynamic
+2026-05-06-19:36:04,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,sphere,3,none,1000,random,3,0.793296,0.264432,0.257768,0.0233753,1,0.276147,72251,0,16,dynamic
+2026-05-06-19:36:05,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,cube,2,none,1000,random,3,0.546791,0.182264,0.187783,0.0151765,1,0.155305,43988,0,16,dynamic
+2026-05-06-19:36:07,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,cube,3,none,1000,random,3,1.09898,0.366327,0.364637,0.00280427,1,0.386472,95596,0,16,dynamic

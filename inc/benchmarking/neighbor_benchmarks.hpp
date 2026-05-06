@@ -516,6 +516,7 @@ class NeighborsBenchmark {
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
                     #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                         for(size_t i = 0; i<searchSet.numSearches; i++) {
+                            if (i%100==0) std::cout << "Search " << i << "/" << searchSet.numSearches << "\n" << std::flush;
                             auto result = oct.template neighbors<kernel>(points[searchIndexes[i]], radius, getRange, mode);
                             averageResultSize += result.size();
                         }

@@ -180,8 +180,7 @@ PrunedRange bestRange(
     ReorderMode mode,
     bool logging = false)
 {
-    const auto leafOffsets = reordered.getSortedFlat().leafOffsets;
-    const size_t count = leafOffsets[leaf + 1] - leafOffsets[leaf];
+    const size_t count = reordered.getSortedFlat().leafOffsets[leaf + 1] - reordered.getSortedFlat().leafOffsets[leaf];
     if (count <=1 ){
         PrunedRange full{0, count, 0,0,false, OrderType::K0};
         return full;
