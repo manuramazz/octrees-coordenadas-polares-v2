@@ -1,5 +1,5 @@
 # setup
-FOLDER="outv2.2-leaves"
+FOLDER="outv2.3-leaves"
 set -e
 mkdir -p "$FOLDER"
 

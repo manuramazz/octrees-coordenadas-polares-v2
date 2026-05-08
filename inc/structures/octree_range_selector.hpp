@@ -175,16 +175,12 @@ PrunedRange bestRange(
     const Point& query,
     double radius,
     Kernel_t kernel,
+    size_t count,
     const Octree_t& octree,
     const Reordered_t& reordered,
     ReorderMode mode,
     bool logging = false)
 {
-    const size_t count = reordered.getSortedFlat().leafOffsets[leaf + 1] - reordered.getSortedFlat().leafOffsets[leaf];
-    if (count <=1 ){
-        PrunedRange full{0, count, 0,0,false, OrderType::K0};
-        return full;
-    }
     const Point& center = octree.getLeafCenter(leaf);
     const auto geo = detail::LeafQueryGeometry::compute(query, center, radius, kernel);
 

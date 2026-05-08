@@ -503,9 +503,9 @@ class NeighborsBenchmark {
             const std::string_view reorderModeStr = localReorderTypeToString(mode);
 
             if (mode != ReorderMode::None) {
-                getRange = [&](uint32_t leafIndex, const Point& query, double radius) {
+                getRange = [&](uint32_t leafIndex, const Point& query, double radius, size_t count) {
                     PrunedRange range = bestRange(leafIndex, query, radius, kernel,
-                                                oct, reordered, mode, false);
+                                                count, oct, reordered, mode, false);
                     return range;
                 };
             }

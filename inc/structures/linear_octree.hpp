@@ -60,6 +60,9 @@ protected:
 	/// @brief The number of octants per internal node
 	static constexpr uint8_t OCTANTS_PER_NODE  = 8;
 
+    /// @brief Threshold for minimum number of points to use getRange and prune leaves
+    static constexpr size_t UMBRAL_PODA = 16;
+
     /// @brief Leaves of the Octree, destroyed after build
     struct LeafPart {
         /**
@@ -669,7 +672,7 @@ protected:
     }
 
 public:    
-    using RangeFn = std::function<PrunedRange(uint32_t, const Point&, double)>;
+    using RangeFn = std::function<PrunedRange(uint32_t, const Point&, double, size_t)>;
 
     /**
      * @brief Builds the linear octree given an array of points, also reporting how much time each step takes
@@ -1016,9 +1019,10 @@ public:
             assert(endIndex <= points.size() && "internalRanges points end out of bounds");
             TimeWatcher getRangeWatcher;
             TimeWatcher loopWatcher;
+            
             // If getRange provided -> uses polar coords optimization
             // Only checks points inside range returned by bestRange (from octree_range_selector)
-            if (getRange && sortedFlat) {
+            if (getRange && sortedFlat && (endIndex - startIndex) > UMBRAL_PODA) {
                 assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 //std::cout << "Leaf n "<< leafIndex << ": [" << startIndex << ", " << endIndex << ")\n";
@@ -1027,7 +1031,7 @@ public:
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
-                    const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
+                    const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, (endIndex - startIndex));
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
@@ -1037,17 +1041,16 @@ public:
                     if (mainOptions.debugLeavesTime) {
                         loopWatcher.start();
                     }
-                    const Point*  leafPts = sortedFlat->leafPoints(leafIndex);   // puntero directo, sin heap
-                    const size_t* leafIdx = sortedFlat->leafGlobalIdx(leafIndex);
+                    const SortedPoint* leafData = sortedFlat->getLeafData(leafIndex);
                     for (size_t i = range.iMin; i < range.iMax; ++i) {
-                        if (k.isInside(leafPts[i])){
-                            ptsInside.push_back(leafIdx[i]);
+                        if (k.isInside(leafData[i].pt)){
+                            ptsInside.push_back(leafData[i].globalIdx);
                         }
                     }
                     if (range.hasSecond) {
                         for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                            if (k.isInside(leafPts[i])){
-                                ptsInside.push_back(leafIdx[i]);
+                            if (k.isInside(leafData[i].pt)){
+                                ptsInside.push_back(leafData[i].globalIdx);
                             }
                         }
                     }
@@ -1058,8 +1061,10 @@ public:
                     return;
                     
                 }
+            }else if(getRange && mainOptions.debugRanges){ 
+                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, (endIndex - startIndex));
             }
-
             if (mainOptions.debugLeavesTime) {
                 loopWatcher.start();
             }

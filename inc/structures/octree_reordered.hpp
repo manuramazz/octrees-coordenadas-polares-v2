@@ -57,8 +57,7 @@ public:
         }
 
         const size_t totalPoints = sortedFlat.leafOffsets[numLeaves];
-        sortedFlat.allPoints.resize(totalPoints);
-        sortedFlat.allGlobalIdx.resize(totalPoints);
+        sortedFlat.allData.resize(totalPoints);
 
         // Paso 2 — rellenar en paralelo (cada hoja escribe en su propio rango, sin solapamiento)
         #pragma omp parallel for schedule(dynamic)
@@ -88,15 +87,20 @@ public:
                     globalIdx = begin + perm[i];
                 }
 
-                sortedFlat.allGlobalIdx[offset + i] = globalIdx;
-
                 if constexpr (std::is_same_v<Container, PointsSoA>) {
-                    sortedFlat.allPoints[offset + i] = Point(
-                        points.dataX()[globalIdx],
-                        points.dataY()[globalIdx],
-                        points.dataZ()[globalIdx]);
+                    sortedFlat.allData[offset + i] = SortedPoint{
+                        Point(
+                            points.dataX()[globalIdx],
+                            points.dataY()[globalIdx],
+                            points.dataZ()[globalIdx]
+                        ),
+                        globalIdx
+                    };
                 } else {
-                    sortedFlat.allPoints[offset + i] = points[globalIdx];
+                    sortedFlat.allData[offset + i] = SortedPoint{
+                        points[globalIdx],
+                        globalIdx
+                    };
                 }
             }
         }
