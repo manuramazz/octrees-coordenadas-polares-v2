@@ -58,7 +58,7 @@ class NeighborsBenchmark {
                                 int numThreads = omp_get_max_threads(), double tolerancePercentage = 0.0) {
             // Check if the file is empty and append header if it is
             if (outputFile.tellp() == 0) {
-                outputFile <<   "date,octree,point_type,encoder,npoints,operation,kernel,radius,reorder,num_searches,sequential_searches,repeats,"
+                outputFile <<   "date,octree,point_type,encoder,npoints,operation,kernel,radius,reorder,num_searches,sequential_searches,repeats,treshold,maxPointsLeaf,"
                                 "accumulated,mean,median,stdev,used_warmup,warmup_time,avg_result_size,tolerance_percentage,"
                                 "openmp_threads,openmp_schedule\n";
             }
@@ -95,6 +95,8 @@ class NeighborsBenchmark {
                 << searchSet.numSearches << ',' 
                 << sequentialSearches << ','
                 << stats.size() << ','
+                << mainOptions.umbralPoda << ','
+                << mainOptions.maxPointsLeaf << ','
                 << stats.accumulated() << ',' 
                 << stats.mean() << ',' 
                 << stats.median() << ',' 
@@ -167,75 +169,6 @@ class NeighborsBenchmark {
                 << eventValues[2]
                 << std::endl;
         }
-
-        template <typename OctreeT, typename ReorderedT>
-        void debugRangeSelector(const OctreeT& oct, const ReorderedT& reordered, ReorderMode mode, Kernel_t kernel) {
-            std::cout << "[LOG] Benchmarking range selector for " << kernelToString(kernel) << std::endl;
-
-            if (mode == ReorderMode::None) {
-                return;
-            }
-
-            const size_t numLeavesToTest = std::min(size_t(15), oct.getNumLeaves());
-            for (size_t r = 0; r < mainOptions.benchmarkRadii.size(); r++) {
-                double testRadius = mainOptions.benchmarkRadii[r];
-
-                for (size_t leaf = 0; leaf < numLeavesToTest; ++leaf) {
-                    std::vector<size_t> leafPoints;
-                    size_t begin = 0;
-                    size_t end = 0;
-                    size_t count = 0;
-                    if constexpr (requires { oct.getLeafPoints(leaf); }) {
-                        leafPoints = oct.getLeafPoints(leaf);
-                        count = leafPoints.size();
-                    } else {
-                        const auto range = oct.getLeafRange(leaf);
-                        begin = range.first;
-                        end = range.second;
-                        count = end - begin;
-                    }
-                    if (count == 0) continue;
-
-                    size_t queryIdx = begin;
-                    if constexpr (requires { oct.getLeafPoints(leaf); }) {
-                        queryIdx = leafPoints[0];
-                    }
-
-                    // Usamos el primer punto de la hoja como query de prueba
-                    Point testQuery;
-                    if constexpr (std::is_same_v<Container, PointsSoA>) {
-                        testQuery = Point(points.dataX()[queryIdx], points.dataY()[queryIdx], points.dataZ()[queryIdx]);
-                    } else {
-                        testQuery = points[queryIdx];
-                    }
-
-                    PrunedRange range = bestRange(
-                        leaf,
-                        testQuery,
-                        testRadius,
-                        kernel,
-                        oct,
-                        reordered,
-                        mode,
-                        false);
-
-                    const double prunedPct = (count > 0)
-                        ? 100.0 * (1.0 - static_cast<double>(range.count()) / count)
-                        : 0.0;
-                    if(prunedPct > 0.01) {
-                        std::cout << "[LOG]   leaf=" << leaf
-                                << " count=" << count
-                                << " bestOrder=K" << static_cast<int>(range.order)
-                                << " range=[" << range.iMin << "," << range.iMax << ")"
-                                << " kept=" << range.count()
-                                << " pruned=" << std::fixed << std::setprecision(1) << prunedPct << "%"
-                                << "\n"
-                                << std::endl;
-                    }
-                }
-            }
-        }
-
 
     public:
         NeighborsBenchmark(Container& points, std::vector<key_t>& codes, Box box, PointEncoder& enc, SearchSet& searchSet, std::ofstream &file) :
@@ -760,7 +693,7 @@ class NeighborsBenchmark {
                     OctreeReordered<std::decay_t<decltype(oct)>, Container> reordered;
 
                     if (mode != ReorderMode::None) {
-                        std::cout << "[LOG] Reordering mode " << (mode == ReorderMode::Cylindrical ? "Cylindrical" : "Spherical") << std::endl;
+                        std::cout << "[LOG] Reordering mode " << (mode == ReorderMode::Polar ? "Polar" : "Cartesian") << std::endl;
                         // Measure time taken by reordering to include it in the logs
                         auto startTime = std::chrono::high_resolution_clock::now();
                         reordered.buildLeafPermutations(oct, points, mode);
@@ -774,7 +707,6 @@ class NeighborsBenchmark {
                     
                     // Bucle sobre kernels
                     for (const auto& kernel : mainOptions.kernels) {
-                        //debugRangeSelector(oct, reordered, mode, kernel);
                         switch (kernel) {
                             case Kernel_t::sphere:
                                 benchmarkLinearOctree<Kernel_t::sphere>(oct, kernelToString(kernel), reordered, mode);
@@ -811,7 +743,7 @@ class NeighborsBenchmark {
 
 
                 if (mode != ReorderMode::None) {
-                    std::cout << "[LOG] Reordering mode " << (mode == ReorderMode::Cylindrical ? "Cylindrical" : "Spherical") << std::endl;
+                    std::cout << "[LOG] Reordering mode " << (mode == ReorderMode::Polar ? "Polar" : "Cartesian") << std::endl;
                     // Measure time taken by reordering to include it in the logs
                     auto startTime = std::chrono::high_resolution_clock::now();
                     reordered.buildLeafPermutations(oct, points, mode);

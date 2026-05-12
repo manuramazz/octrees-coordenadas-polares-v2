@@ -17,3 +17,28 @@ Añadir a las gráficas:
 - tamaño de las hojas
 
 Luego hacer experimento modificando los parámetros hablados
+
+
+
+09/05: PLAN (implementar podas x,y,z juntas)
+ - DONE refactorizar nombres de reordenaciones
+ - DONE modificar buildLeafPermutations para soportar nuevas reorders
+ - IN modificar range selector para optimizar búsquedas binarias (si se pasan del tamaño de la hoja O(1))
+
+11/05 PLAN
+- DONE revisar y optimizar computeRange
+- DONE adaptar bestRange
+- DONE revisar integración benchmark y linear
+- DONE compilar
+- DONE probar para tantear tiempos
+- DONE insertar nuevos parámetros en debugs
+- DONE (ya estaba hecho) hacer parámetro NUM_POINTS_PER_LEAF 
+- implementar forma de hints alternativa ?? (creo que no)
+- DONE preparar experimento!!!
+
+RESUMEN FLUJO:
+1. CONSTRUCCIÓN 
+ - D
+ - KJ
+2. Cara
+

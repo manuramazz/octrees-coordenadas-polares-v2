@@ -60,8 +60,6 @@ protected:
 	/// @brief The number of octants per internal node
 	static constexpr uint8_t OCTANTS_PER_NODE  = 8;
 
-    /// @brief Threshold for minimum number of points to use getRange and prune leaves
-    static constexpr size_t UMBRAL_PODA = 16;
 
     /// @brief Leaves of the Octree, destroyed after build
     struct LeafPart {
@@ -944,7 +942,7 @@ public:
             rangeTimingLogHeaderWritten = true;
             std::error_code ec;
             if (!std::filesystem::exists(logPath, ec) || std::filesystem::file_size(logPath, ec) == 0) {
-                logFile << "kernel,radius,mode,get_range_time,loop_time\n";
+                logFile << "kernel,radius,mode,get_range_time,loop_time,threshold,maxPointsLeaf\n";
             }
         }
 
@@ -952,7 +950,9 @@ public:
                 << std::to_string(radius) << ","
                 << localReorderTypeToString(mode) << ","
                 << accumulatedGetRangeTime << ","
-                << accumulatedLoopTime << "\n";
+                << accumulatedLoopTime << ","
+                << std::to_string(mainOptions.umbralPoda) << ","
+                << std::to_string(mainOptions.maxPointsLeaf) << "\n";
         hasLoggedThisSearch = true;
     }
 
@@ -1022,7 +1022,7 @@ public:
             
             // If getRange provided -> uses polar coords optimization
             // Only checks points inside range returned by bestRange (from octree_range_selector)
-            if (getRange && sortedFlat && (endIndex - startIndex) > UMBRAL_PODA) {
+            if (getRange && sortedFlat && (endIndex - startIndex) > mainOptions.umbralPoda) {
                 assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
                 //std::cout << "Leaf n "<< leafIndex << ": [" << startIndex << ", " << endIndex << ")\n";
@@ -1041,7 +1041,7 @@ public:
                     if (mainOptions.debugLeavesTime) {
                         loopWatcher.start();
                     }
-                    const SortedPoint* leafData = sortedFlat->getLeafData(leafIndex);
+                    const SortedPoint* leafData = sortedFlat->leafData(leafIndex, (endIndex - startIndex), static_cast<int>(range.order));
                     for (size_t i = range.iMin; i < range.iMax; ++i) {
                         if (k.isInside(leafData[i].pt)){
                             ptsInside.push_back(leafData[i].globalIdx);
@@ -1061,9 +1061,6 @@ public:
                     return;
                     
                 }
-            }else if(getRange && mainOptions.debugRanges){ 
-                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, (endIndex - startIndex));
             }
             if (mainOptions.debugLeavesTime) {
                 loopWatcher.start();

@@ -7,7 +7,7 @@ heaptrack
 lib
 old
 out*
-prueba
+prueba*
 logs
 plots/__pycache__
 cmake-build-debug

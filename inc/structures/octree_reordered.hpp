@@ -14,6 +14,7 @@
 #include <omp.h>
 
 #include "octree_types.hpp"
+#include "main_options.hpp"
 
 
 template<typename Octree_t, typename Container>
@@ -38,7 +39,6 @@ public:
     void buildSortedDataFlat(
         Octree_t& octree,
         Container& points,
-        OrderType order,
         ReorderMode mode,
         std::vector<LeafPermutations>& leafPerms)
     {
@@ -46,28 +46,31 @@ public:
             return;
 
         const size_t numLeaves = octree.getNumLeaves();
-
+        sortedFlat.isPolar = (mode == ReorderMode::Polar);
         // Paso 1 — calcular offsets (necesita saber el count de cada hoja)
         sortedFlat.leafOffsets.resize(numLeaves + 1);
         sortedFlat.leafOffsets[0] = 0;
 
         for (size_t leaf = 0; leaf < numLeaves; ++leaf) {
-            const size_t count = leafPerms[leaf].perms[static_cast<int>(order)].size();
+            size_t count = leafPerms[leaf].perms[0].size();
+            if(count <= mainOptions.umbralPoda) count = 0;
             sortedFlat.leafOffsets[leaf + 1] = sortedFlat.leafOffsets[leaf] + count;
         }
 
         const size_t totalPoints = sortedFlat.leafOffsets[numLeaves];
-        sortedFlat.allData.resize(totalPoints);
+        sortedFlat.allData.resize(
+            mode == ReorderMode::Cartesian ? totalPoints * 3 : totalPoints
+        );
+
 
         // Paso 2 — rellenar en paralelo (cada hoja escribe en su propio rango, sin solapamiento)
         #pragma omp parallel for schedule(dynamic)
         for (size_t leaf = 0; leaf < numLeaves; ++leaf)
         {
-            const auto& perm = leafPerms[leaf].perms[static_cast<int>(order)];
-            const size_t count = perm.size();
-            const size_t offset = sortedFlat.leafOffsets[leaf];
-
-            if (count == 0) continue;
+            const size_t offset     = sortedFlat.leafOffsets[leaf];
+            const size_t nextOffset = sortedFlat.leafOffsets[leaf + 1];
+            if (offset == nextOffset) continue;
+            const size_t count = nextOffset - offset;
 
             size_t begin = 0;
             std::vector<size_t> leafPointsLocal;
@@ -79,32 +82,70 @@ public:
                 begin = b;
             }
 
-            for (size_t i = 0; i < count; ++i) {
-                size_t globalIdx;
-                if constexpr (requires { octree.getLeafPoints(leaf); }) {
-                    globalIdx = leafPointsLocal[perm[i]];
-                } else {
-                    globalIdx = begin + perm[i];
+            if (mode == ReorderMode::Cartesian) {
+                // 3 órdenes: X, Y, Z — cada uno ocupa su propio bloque en allData
+                // Layout: [bloque_X | bloque_Y | bloque_Z] para cada hoja
+                // Los offsets apuntan al inicio del bloque X; Y y Z están desplazados
+                // Para simplificar, aquí llenamos los 3 bloques contiguos:
+                // allData[offset*3 + 0..count)   = ordenado por X
+                // allData[offset*3 + count..2*count) = ordenado por Y
+                // allData[offset*3 + 2*count..3*count) = ordenado por Z
+
+                for (int axis = 0; axis < 3; ++axis) {
+                    const auto& perm = leafPerms[leaf].perms[axis];
+                    const size_t blockOffset = offset * 3 + axis * count;
+
+                    for (size_t i = 0; i < count; ++i) {
+                        size_t globalIdx;
+                        if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                            globalIdx = leafPointsLocal[perm[i]];
+                        } else {
+                            globalIdx = begin + perm[i];
+                        }
+
+                        if constexpr (std::is_same_v<Container, PointsSoA>) {
+                            sortedFlat.allData[blockOffset + i] = SortedPoint{
+                                Point(points.dataX()[globalIdx],
+                                    points.dataY()[globalIdx],
+                                    points.dataZ()[globalIdx]),
+                                globalIdx
+                            };
+                        } else {
+                            sortedFlat.allData[blockOffset + i] = SortedPoint{
+                                points[globalIdx], globalIdx
+                            };
+                        }
+                    }
                 }
 
-                if constexpr (std::is_same_v<Container, PointsSoA>) {
-                    sortedFlat.allData[offset + i] = SortedPoint{
-                        Point(
-                            points.dataX()[globalIdx],
-                            points.dataY()[globalIdx],
-                            points.dataZ()[globalIdx]
-                        ),
-                        globalIdx
-                    };
-                } else {
-                    sortedFlat.allData[offset + i] = SortedPoint{
-                        points[globalIdx],
-                        globalIdx
-                    };
+            } else {
+                // Polar: un solo orden (K0)
+                const auto& perm = leafPerms[leaf].perms[0];
+
+                for (size_t i = 0; i < count; ++i) {
+                    size_t globalIdx;
+                    if constexpr (requires { octree.getLeafPoints(leaf); }) {
+                        globalIdx = leafPointsLocal[perm[i]];
+                    } else {
+                        globalIdx = begin + perm[i];
+                    }
+
+                    if constexpr (std::is_same_v<Container, PointsSoA>) {
+                        sortedFlat.allData[offset + i] = SortedPoint{
+                            Point(points.dataX()[globalIdx],
+                                points.dataY()[globalIdx],
+                                points.dataZ()[globalIdx]),
+                            globalIdx
+                        };
+                    } else {
+                        sortedFlat.allData[offset + i] = SortedPoint{
+                            points[globalIdx], globalIdx
+                        };
+                    }
                 }
             }
         }
-        std::cout << "Finished building sorted data flat for order " << static_cast<int>(order) << " with mode " << localReorderTypeToString(mode) << std::endl;
+        std::cout << "Finished building sorted data flat" << " with mode " << localReorderTypeToString(mode) << std::endl;
     }
 
     const SortedDataFlat& getSortedFlat() const {
@@ -149,22 +190,16 @@ public:
                 end   = range.second;
                 count = end - begin;
             }
-            if (count == 0)
-                continue;
-            
-            if(count == 1) {
-                // Si solo hay un punto, las tres permutaciones son iguales (la única posición)
-                for (int k = 0; k < 3; ++k) {
-                    leafPerms[leaf].perms[k].resize(1);
-                    leafPerms[leaf].perms[k][0] = 0;
-                }
+
+            if(count <= mainOptions.umbralPoda) {
+                // No reorder for small leaves, to avoid overhead of keys and sorts
                 continue;
             }
 
             const auto& center = octree.getLeafCenter(leaf);
-
+            size_t nVectors = (mode == ReorderMode::Polar) ? 1 : 3;
             // inicializar permutaciones y claves
-            for (int k = 0; k < 3; ++k) {
+            for (int k = 0; k < nVectors; ++k) {
                 leafKeys[leaf].keys[k].resize(count);
                 leafPerms[leaf].perms[k].resize(count);
                 std::iota(leafPerms[leaf].perms[k].begin(),
@@ -193,22 +228,18 @@ public:
                     dz = points[idx].getZ() - center.getZ();
                 }
 
-                const double phi = detail::normalizeAngle0To2Pi(std::atan2(dy, dx));
-                const double rxy = std::sqrt(dx * dx + dy * dy);
-
-                if (mode == ReorderMode::Cylindrical)
+                // Ángulo phi en XY (0 a 2pi)
+                if (mode == ReorderMode::Polar)
                 {
+                    const double phi = detail::normalizeAngle0To2Pi(std::atan2(dy, dx));
+                    const double rxy = std::sqrt(dx * dx + dy * dy);
                     leafKeys[leaf].keys[0][i] = phi;
-                    leafKeys[leaf].keys[1][i] = rxy;
-                    leafKeys[leaf].keys[2][i] = dz;
                 }
-                else // Spherical
+                else if (mode == ReorderMode::Cartesian) // Coordenadas cartesianas: orden por X, Y, Z
                 {
-                    const double r = std::sqrt(rxy * rxy + dz * dz);
-                    double theta = (r > 0.0) ? std::acos(std::clamp(dz / r, -1.0, 1.0)) : 0.0;
-                    leafKeys[leaf].keys[0][i] = phi;
-                    leafKeys[leaf].keys[1][i] = theta;
-                    leafKeys[leaf].keys[2][i] = r;
+                    leafKeys[leaf].keys[0][i] = dx;
+                    leafKeys[leaf].keys[1][i] = dy;
+                    leafKeys[leaf].keys[2][i] = dz;
                 }
             }
 
@@ -216,7 +247,7 @@ public:
             // ordenar permutaciones por claves KO, K1 y K2
             // --------------------------------
             std::vector<double> sortedK(count);
-            for (int k = 0; k < 3; ++k)
+            for (int k = 0; k < nVectors; ++k)
             {
                 auto& perm = leafPerms[leaf].perms[k];
 
@@ -233,7 +264,7 @@ public:
                 leafKeys[leaf].keys[k] = sortedK;
             }
         }
-        buildSortedDataFlat(octree, points, OrderType::K0, mode, leafPerms);
+        buildSortedDataFlat(octree, points, mode, leafPerms);
     }
 
     // ==========================

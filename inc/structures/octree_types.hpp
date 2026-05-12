@@ -19,14 +19,15 @@ struct SortedPoint {
 
 
 struct SortedDataFlat {
+    bool isPolar = false;
     std::vector<SortedPoint> allData;     // todos los puntos de todas las hojas, ordenados por hoja 
     std::vector<size_t> leafOffsets;   // leafOffsets[leaf] = inicio en allPoints
                                        // leafOffsets[leaf+1] - leafOffsets[leaf] = count de la hoja
 
     // Acceso al inicio de los datos de una hoja
-    [[nodiscard]] const SortedPoint* getLeafData(size_t leaf) const {
-        // leafOffsets[leaf] nos da la posición de inicio
-        return allData.data() + leafOffsets[leaf];
+    [[nodiscard]] const SortedPoint* leafData(size_t leaf, size_t count, int axis) const {
+        int mult = isPolar ? 1 : 3; 
+        return allData.data() + leafOffsets[leaf] * mult + axis * count;
     }
 
     // Número de puntos de una hoja
@@ -44,7 +45,7 @@ struct PrunedRange {
     bool hasSecond = false;
     OrderType order = OrderType::K0;
 
-    [[nodiscard]] size_t count() const { return iMax - iMin; }
+    [[nodiscard]] size_t count() const { return hasSecond ? (iMax - iMin) + (iMax2 - iMin2) : (iMax - iMin); }
 };
 
 
@@ -103,7 +104,8 @@ namespace detail {
             g.dz  = query.getZ() - center.getZ();
             g.dxy = std::sqrt(g.dx * g.dx + g.dy * g.dy);
             g.d   = std::sqrt(g.dxy * g.dxy + g.dz * g.dz);
-            g.rEff   = effectiveRadius(radius, kernel);
+            //g.rEff   = effectiveRadius(radius, kernel);
+            g.rEff = 0;
             g.rxyEff = effectiveXYRadius(radius, kernel);
             g.radius = radius;
             return g;

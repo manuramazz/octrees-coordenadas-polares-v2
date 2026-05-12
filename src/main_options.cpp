@@ -43,8 +43,8 @@ void printHelp() {
 		<< "    'hilb'  - Hilbert SFC Reordering\n\n"
 		<< "-l, --local-reorders: Select local reorderings to apply to the cloud before the searches (comma-separated or 'all'). Default: all. Possible values:\n"
 		<< "    'none'          - no local reordering\n"
-		<< "    'cylindrical'   - cylindrical local reordering\n"
-		<< "    'spherical'     - spherical local reordering\n\n"
+		<< "    'polar'         - polar local reordering (azimuthal angle)\n"
+		<< "    'cartesian'     - cartesian local reordering (x, y, z coordinates)\n\n"
 
 		<< "Other options:\n"
 		<< "--debug: Enable debug mode (measures octree build and encoding times)\n"
@@ -61,7 +61,8 @@ void printHelp() {
 		<< "               If not specified, OpenMP defaults to maximum threads and no scalability test is run\n"
 		<< "--sequential: Make the search set sequential instead of random (usually faster). Automatically set when -s all is used\n"
 		<< "--max-leaf: Max number of points per octree leaf (default = 128). Does not apply to PCL Octree\n"
-		<< "--pcl-oct-resolution: Min octant size for subdivision in PCL Octree\n";
+		<< "--pcl-oct-resolution: Min octant size for subdivision in PCL Octree\n"
+		<< "-u, --umbral-poda: Threshold for minimum number of points to use getRange and prune leaves (default = 16)\n";
 	exit(1);
 }
 
@@ -185,8 +186,8 @@ std::set<Kernel_t> parseKernelOptions(const std::string& kernelStr) {
 std::set<ReorderMode> parseLocalReorderOptions(const std::string& reorderStr) {
     static const std::unordered_map<std::string, ReorderMode> reorderMap = {
         {"none", ReorderMode::None},
-        {"cylindrical", ReorderMode::Cylindrical},
-        {"spherical", ReorderMode::Spherical}
+        {"polar", ReorderMode::Polar},
+        {"cartesian", ReorderMode::Cartesian}
     };
 
     std::set<ReorderMode> selectedReorders;
@@ -387,6 +388,10 @@ void processArgs(int argc, char** argv)
 				break;
 			case LongOptions::PCL_OCT_RESOLUTION:
 				mainOptions.pclOctResolution = std::stod(std::string(optarg));
+				break;
+			case 'u':
+			case LongOptions::UMBRAL_PODA:
+				mainOptions.umbralPoda = std::stoul(std::string(optarg));
 				break;
 			default:
 				printHelp();

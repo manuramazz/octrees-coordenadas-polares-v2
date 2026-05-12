@@ -1,5 +1,5 @@
 # setup
-FOLDER="outv2.3-ranges"
+FOLDER="outv3-ranges"
 set -e
 mkdir -p "$FOLDER"
 
@@ -14,14 +14,24 @@ datasets_high_density=(
     "data/semantic3d/sg27_station8_intensity_rgb.las"
     #"data/speulderbos/Speulderbos_2017_TLS.las"
 )
-
+MAX_POINTS_LEAF=(128, 256, 512)
+UMBRALES_PODA=(8, 16, 32)
 N_SEARCHES="60"
 ALGO="neighborsPrune"
 
 # range debug searches (subsets)
-for data in "${datasets_low_density[@]}"; do 
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.1,0.3,0.5,1.0,2.0,3.0" -s "$N_SEARCHES" --repeats 1 -a "$ALGO" --local-reorder "none,spherical" --num-threads 1 --debug-ranges
+for data in "${datasets_low_density[@]}"; do
+  for leaf in "${MAX_POINTS_LEAF[@]}"; do
+    for umbral in "${UMBRALES_PODA[@]}"; do
+      ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.1,0.3,0.5,1.0,2.0,3.0" -s "$N_SEARCHES" --repeats 1 -a "$ALGO" --local-reorder "polar,cartesian" --num-threads 1 --debug-ranges --max-leaf "$leaf" --umbral-poda "$umbral" 
+    done
+  done
 done
+
 for data in "${datasets_high_density[@]}"; do
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.005,0.01,0.025,0.05,0.1,0.2" -s "$N_SEARCHES" --repeats 1 -a "$ALGO" --local-reorder "none,spherical" --num-threads 1 --debug-ranges
+  for leaf in "${MAX_POINTS_LEAF[@]}"; do
+    for umbral in "${UMBRALES_PODA[@]}"; do
+      ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.1,0.3,0.5,1.0,2.0,3.0" -s "$N_SEARCHES" --repeats 1 -a "$ALGO" --local-reorder "polar,cartesian" --num-threads 1 --debug-ranges --max-leaf "$leaf" --umbral-poda "$umbral"
+    done
+  done
 done

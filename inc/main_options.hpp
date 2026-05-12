@@ -37,14 +37,14 @@ enum SearchAlgo {
 
 enum ReorderMode {
     None,
-    Cylindrical,
-    Spherical
+    Polar,
+    Cartesian
 };
 
 constexpr std::pair<ReorderMode, std::string_view> reorderModeMap[] = {
     { ReorderMode::None,       		"none" },
-    { ReorderMode::Cylindrical,   	"cylindrical" },
-    { ReorderMode::Spherical,   	"spherical" }
+    { ReorderMode::Polar,   	"polar" },
+    { ReorderMode::Cartesian,   	"cartesian" }
 };
 
 constexpr std::pair<SearchAlgo, std::string_view> searchAlgoMap[] = {
@@ -215,7 +215,7 @@ public:
 		EncoderType::HILBERT_ENCODER_2D_Y, 
 		EncoderType::HILBERT_ENCODER_2D_Z, 
 	};
-	std::set<ReorderMode> localReorders{ReorderMode::None, ReorderMode::Cylindrical, ReorderMode::Spherical};
+	std::set<ReorderMode> localReorders{ReorderMode::None, ReorderMode::Polar, ReorderMode::Cartesian};
 
 
 	bool debug{false};
@@ -233,6 +233,7 @@ public:
 	bool searchAll{false};
 	size_t maxPointsLeaf = 128;
 	double pclOctResolution = 0.1;
+	size_t umbralPoda = 16;
 };
 
 extern main_options mainOptions;
@@ -264,11 +265,12 @@ enum LongOptions : int
 	NUM_THREADS,
 	SEQUENTIAL_SEARCH_SET,
 	MAX_POINTS_LEAF,
-	PCL_OCT_RESOLUTION
+	PCL_OCT_RESOLUTION,
+	UMBRAL_PODA
 };
 
 // Define short options
-const char* const short_opts = "h:i:c:o:r:v:s:t:b:k:a:e:cb:";
+const char* const short_opts = "h:i:c:o:r:v:s:t:b:k:a:e:cb:u:";
 
 // Define long options
 const option long_opts[] = {
@@ -299,6 +301,7 @@ const option long_opts[] = {
 	{ "sequential", no_argument, nullptr, LongOptions::SEQUENTIAL_SEARCH_SET },
 	{ "max-leaf", required_argument, nullptr, LongOptions::MAX_POINTS_LEAF },
 	{ "pcl-oct-resolution", required_argument, nullptr, LongOptions::PCL_OCT_RESOLUTION },
+	{ "umbral-poda", required_argument, nullptr, LongOptions::UMBRAL_PODA },
 	{ nullptr, 0, nullptr, 0 }
 };
 
