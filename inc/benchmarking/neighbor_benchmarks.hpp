@@ -58,7 +58,7 @@ class NeighborsBenchmark {
                                 int numThreads = omp_get_max_threads(), double tolerancePercentage = 0.0) {
             // Check if the file is empty and append header if it is
             if (outputFile.tellp() == 0) {
-                outputFile <<   "date,octree,point_type,encoder,npoints,operation,kernel,radius,reorder,num_searches,sequential_searches,repeats,treshold,maxPointsLeaf,"
+                outputFile <<   "date,octree,point_type,encoder,npoints,operation,kernel,radius,reorder,num_searches,sequential_searches,repeats,threshold,maxPointsLeaf,"
                                 "accumulated,mean,median,stdev,used_warmup,warmup_time,avg_result_size,tolerance_percentage,"
                                 "openmp_threads,openmp_schedule\n";
             }

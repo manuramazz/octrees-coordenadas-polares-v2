@@ -167,6 +167,7 @@ protected:
 
     mutable std::optional<std::filesystem::path> rangeTimingLogPath;
     mutable bool rangeTimingLogHeaderWritten = false;
+    mutable bool rangeDebugHeaderWritten = false;
 
 
 
@@ -892,12 +893,34 @@ public:
     /*
     * @brief Auxiliar func to log selected ranges during searches with getRange
     */
-    void logLeafRange(uint32_t leafIndex, size_t iMin, size_t iMax) const {
-        std::filesystem::path leafRangeLogPath = mainOptions.outputDirName / "leaf_range_log.log";
-        std::ofstream leafRangeLogFile(leafRangeLogPath, std::ios_base::app);
-        if (leafRangeLogFile.is_open()) {
-            leafRangeLogFile << "Leaf " << leafIndex << ": [" << iMin << ", " << iMax << ")\n";
-        }
+
+
+    inline std::ofstream& getRangeSelectorLog() const{
+        static std::ofstream logFile = []() {
+            const std::string baseName =
+                mainOptions.inputFileName.empty() ? "input" : mainOptions.inputFileName;
+
+            const auto now = std::chrono::system_clock::now();
+            const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+            std::tm tmSnapshot{};
+    #ifdef _WIN32
+            localtime_s(&tmSnapshot, &nowTime);
+    #else
+            localtime_r(&nowTime, &tmSnapshot);
+    #endif
+
+            std::ostringstream stamp;
+            stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
+
+            const std::filesystem::path logDir = mainOptions.outputDirName / "ranges";
+            std::error_code ec;
+            std::filesystem::create_directories(logDir, ec);
+
+            const std::filesystem::path logPath = logDir / (baseName + "-" + stamp.str() + ".log");
+            return std::ofstream(logPath, std::ios::app);
+        }();
+        
+        return logFile;
     }
 
     std::filesystem::path getFindAndInsertPointsLogPath() const {
@@ -916,9 +939,37 @@ public:
 
             std::ostringstream stamp;
             stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
-            rangeTimingLogPath = logDir / (baseName + "_" + stamp.str() + ".csv");
+            rangeTimingLogPath = logDir / (baseName + "-" + stamp.str() + ".csv");
         }
         return *rangeTimingLogPath;
+    }
+
+    inline void printRangeSelectorLog(const std::string& message) const {
+        auto& f = getRangeSelectorLog();
+        if(!rangeDebugHeaderWritten) {
+            f << "leaf,kernel,mode,radius,L,neighbours,count,total,key,threshold,maxPointsLeaf\n";
+            rangeDebugHeaderWritten = true;
+        }
+        if (f.is_open())
+            f << message << '\n';
+    }
+
+
+    void writeDetailedLeafRangeLog(size_t leaf, const std::string& kernelName, const PrunedRange& range, ReorderMode mode, double radius, size_t totalPoints, size_t neighborsFound) const {
+        std::stringstream ss;
+        ss << leaf << ","
+        << kernelName << ","
+        << localReorderTypeToString(mode) << ","
+        << radius << ","
+        << getLeafHalfSizeByLeafIndex(leaf).getX() << ","
+        << neighborsFound << ","                  // Vecinos reales
+        << range.count() << ","                   // Puntos procesados tras poda
+        << totalPoints << ","                     // Puntos originales de la hoja
+        << static_cast<int>(range.order) << ","
+        << mainOptions.umbralPoda << ","
+        << mainOptions.maxPointsLeaf;
+        
+        printRangeSelectorLog(ss.str());
     }
 
     void resetFindAndInsertPointsAccumulators() const {
@@ -955,6 +1006,8 @@ public:
                 << std::to_string(mainOptions.maxPointsLeaf) << "\n";
         hasLoggedThisSearch = true;
     }
+
+
 
     template<typename Kernel>
     static std::string getKernelName(const Kernel&) {
@@ -1011,14 +1064,11 @@ public:
         resetFindAndInsertPointsAccumulators();
         auto findAndInsertPoints = [&](uint32_t nodeIndex) {
             // Reached a leaf, add all points inside the kernel
-            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::findAndInsertPoints");
-            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
             size_t startIndex = this->internalRanges[nodeIndex].first;
             size_t endIndex = this->internalRanges[nodeIndex].second;
-            assert(startIndex <= endIndex && "invalid range in internalRanges");
-            assert(endIndex <= points.size() && "internalRanges points end out of bounds");
             TimeWatcher getRangeWatcher;
             TimeWatcher loopWatcher;
+            const size_t sizeBefore = ptsInside.size();
             
             // If getRange provided -> uses polar coords optimization
             // Only checks points inside range returned by bestRange (from octree_range_selector)
@@ -1041,16 +1091,18 @@ public:
                     if (mainOptions.debugLeavesTime) {
                         loopWatcher.start();
                     }
-                    const SortedPoint* leafData = sortedFlat->leafData(leafIndex, (endIndex - startIndex), static_cast<int>(range.order));
+                    const Point* leafPoints = sortedFlat->leafData(leafIndex, (endIndex - startIndex), static_cast<int>(range.order));
                     for (size_t i = range.iMin; i < range.iMax; ++i) {
-                        if (k.isInside(leafData[i].pt)){
-                            ptsInside.push_back(leafData[i].globalIdx);
+                        const Point& p = leafPoints[i]; 
+                        if (k.isInside(p)) {
+                            ptsInside.push_back(p.id());
                         }
                     }
                     if (range.hasSecond) {
                         for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                            if (k.isInside(leafData[i].pt)){
-                                ptsInside.push_back(leafData[i].globalIdx);
+                            const Point& p = leafPoints[i];
+                            if (k.isInside(p)) {
+                                ptsInside.push_back(p.id());
                             }
                         }
                     }
@@ -1058,6 +1110,10 @@ public:
                         loopWatcher.stop();
                         accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
                     }
+                    if(mainOptions.debugRanges) {
+                        size_t neighborsFound = ptsInside.size() - sizeBefore;
+                        writeDetailedLeafRangeLog(leafIndex, getKernelName(k), range, mode, searchRadius, endIndex - startIndex, neighborsFound);
+                    }   
                     return;
                     
                 }

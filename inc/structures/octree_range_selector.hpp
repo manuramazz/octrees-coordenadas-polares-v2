@@ -17,45 +17,7 @@
 
 // ---------------------------------------------------------------
 
-bool headers = false;
 
-inline std::ofstream& getRangeSelectorLog() {
-    static std::ofstream logFile = []() {
-        const std::string baseName =
-            mainOptions.inputFileName.empty() ? "input" : mainOptions.inputFileName;
-
-        const auto now = std::chrono::system_clock::now();
-        const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-        std::tm tmSnapshot{};
-#ifdef _WIN32
-        localtime_s(&tmSnapshot, &nowTime);
-#else
-        localtime_r(&nowTime, &tmSnapshot);
-#endif
-
-        std::ostringstream stamp;
-        stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
-
-        const std::filesystem::path logDir = mainOptions.outputDirName / "ranges";
-        std::error_code ec;
-        std::filesystem::create_directories(logDir, ec);
-
-        const std::filesystem::path logPath = logDir / (baseName + "_" + stamp.str() + ".log");
-        return std::ofstream(logPath, std::ios::app);
-    }();
-    
-    return logFile;
-}
-
-inline void printLog(const std::string& message) {
-    auto& f = getRangeSelectorLog();
-    if(!headers) {
-        f << "leaf,kernel,mode,radius,L,count,total,key,threshold,maxPointsLeaf\n";
-        headers = true;
-    }
-    if (f.is_open())
-        f << message << '\n';
-}
 // ###########################################################################################
 // ###################### FUNCIÓN DE SELECCIÓN DE RANGO PARA POLAR/CARTESIAN ##################
 // ###########################################################################################
@@ -170,20 +132,6 @@ PrunedRange bestRange(
             if (r.count() < best.count())
                 best = r;
         }
-    }
-
-    if (mainOptions.debugRanges) {
-        printLog(
-            std::to_string(leaf) + "," +
-            std::string(kernelToString(kernel)) + "," +
-            std::string(localReorderTypeToString(mode)) + "," +
-            std::to_string(radius) + "," +
-            std::to_string(octree.getLeafHalfSizeByLeafIndex(leaf).getX()) + "," +
-            std::to_string(best.count()) + "," +
-            std::to_string(count) + "," +
-            std::to_string(static_cast<int>(best.order)) + "," +
-            std::to_string(mainOptions.umbralPoda) + "," +
-            std::to_string(mainOptions.maxPointsLeaf));
     }
 
     return best;

@@ -1,5 +1,5 @@
 # setup
-FOLDER="outv3-ranges"
+FOLDER="outv4-ranges"
 set -e
 mkdir -p "$FOLDER"
 
@@ -31,7 +31,7 @@ done
 for data in "${datasets_high_density[@]}"; do
   for leaf in "${MAX_POINTS_LEAF[@]}"; do
     for umbral in "${UMBRALES_PODA[@]}"; do
-      ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.1,0.3,0.5,1.0,2.0,3.0" -s "$N_SEARCHES" --repeats 1 -a "$ALGO" --local-reorder "polar,cartesian" --num-threads 1 --debug-ranges --max-leaf "$leaf" --umbral-poda "$umbral"
+      ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.01,0.05,0.1,0.2,0.3" -s "$N_SEARCHES" --repeats 1 -a "$ALGO" --local-reorder "polar,cartesian" --num-threads 1 --debug-ranges --max-leaf "$leaf" --umbral-poda "$umbral"
     done
   done
 done

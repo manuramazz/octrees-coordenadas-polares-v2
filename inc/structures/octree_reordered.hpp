@@ -62,7 +62,6 @@ public:
             mode == ReorderMode::Cartesian ? totalPoints * 3 : totalPoints
         );
 
-
         // Paso 2 — rellenar en paralelo (cada hoja escribe en su propio rango, sin solapamiento)
         #pragma omp parallel for schedule(dynamic)
         for (size_t leaf = 0; leaf < numLeaves; ++leaf)
@@ -102,19 +101,10 @@ public:
                         } else {
                             globalIdx = begin + perm[i];
                         }
-
-                        if constexpr (std::is_same_v<Container, PointsSoA>) {
-                            sortedFlat.allData[blockOffset + i] = SortedPoint{
-                                Point(points.dataX()[globalIdx],
-                                    points.dataY()[globalIdx],
-                                    points.dataZ()[globalIdx]),
-                                globalIdx
-                            };
-                        } else {
-                            sortedFlat.allData[blockOffset + i] = SortedPoint{
-                                points[globalIdx], globalIdx
-                            };
-                        }
+                        const auto& p = points[globalIdx];
+                        sortedFlat.allData[blockOffset + i] = Point(globalIdx, p.getX(), p.getY(), p.getZ());
+   
+                        
                     }
                 }
 
@@ -129,19 +119,8 @@ public:
                     } else {
                         globalIdx = begin + perm[i];
                     }
-
-                    if constexpr (std::is_same_v<Container, PointsSoA>) {
-                        sortedFlat.allData[offset + i] = SortedPoint{
-                            Point(points.dataX()[globalIdx],
-                                points.dataY()[globalIdx],
-                                points.dataZ()[globalIdx]),
-                            globalIdx
-                        };
-                    } else {
-                        sortedFlat.allData[offset + i] = SortedPoint{
-                            points[globalIdx], globalIdx
-                        };
-                    }
+                    const auto& p = points[globalIdx];
+                    sortedFlat.allData[offset + i] = Point(globalIdx, p.getX(), p.getY(), p.getZ());
                 }
             }
         }

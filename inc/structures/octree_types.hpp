@@ -7,31 +7,28 @@ enum class OrderType {
     K2 = 2  // orden por clave 2 (z para cilíndricas, r para esféricas)
 };
 
-struct LeafSortedData {
-    std::vector<Point> points;
-    std::vector<size_t> globalIdxs; // Índices globales de los puntos en el orden original
-};
-
-struct SortedPoint {
-    Point  pt;          // todos los puntos de todas las hojas
-    size_t globalIdx;   // todos los índices globales correspondientes
-};
-
 
 struct SortedDataFlat {
     bool isPolar = false;
-    std::vector<SortedPoint> allData;     // todos los puntos de todas las hojas, ordenados por hoja 
-    std::vector<size_t> leafOffsets;   // leafOffsets[leaf] = inicio en allPoints
-                                       // leafOffsets[leaf+1] - leafOffsets[leaf] = count de la hoja
+    std::vector<Point> allData; 
+    std::vector<size_t> leafOffsets; // leafOffsets[leaf] = inicio en allData
 
-    // Acceso al inicio de los datos de una hoja
-    [[nodiscard]] const SortedPoint* leafData(size_t leaf, size_t count, int axis) const {
-        int mult = isPolar ? 1 : 3; 
-        return allData.data() + leafOffsets[leaf] * mult + axis * count;
+    /**
+     * Devuelve el puntero al inicio del bloque de puntos de una hoja para un eje dado.
+     */
+    [[nodiscard]] inline const Point* leafData(size_t leaf, size_t count, int axis) const {
+        const int mult = isPolar ? 1 : 3; 
+        return allData.data() + (leafOffsets[leaf] * mult) + (axis * count);
     }
 
-    // Número de puntos de una hoja
-    [[nodiscard]] size_t leafCount(size_t leaf) const {
+    /**
+     * Permite acceder a un punto específico por referencia.
+     */
+    [[nodiscard]] inline const Point& getPoint(size_t leaf, size_t count, int axis, size_t localIdx) const {
+        return leafData(leaf, count, axis)[localIdx];
+    }
+
+    [[nodiscard]] inline size_t leafCount(size_t leaf) const {
         return leafOffsets[leaf + 1] - leafOffsets[leaf];
     }
 };

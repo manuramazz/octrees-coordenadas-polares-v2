@@ -1,9 +1,0 @@
-date,octree,point_type,encoder,npoints,operation,kernel,radius,reorder,num_searches,sequential_searches,repeats,accumulated,mean,median,stdev,used_warmup,warmup_time,avg_result_size,tolerance_percentage,openmp_threads,openmp_schedule
-2026-05-06-19:29:11,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,sphere,2,none,80,random,1,0.0169346,0.0169346,0.0169346,0,1,0.019273,31364,0,1,dynamic
-2026-05-06-19:29:11,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,sphere,3,none,80,random,1,0.0323339,0.0323339,0.0323339,0,1,0.0287781,70139,0,1,dynamic
-2026-05-06-19:29:11,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,cube,2,none,80,random,1,0.0184887,0.0184887,0.0184887,0,1,0.0197728,42598,0,1,dynamic
-2026-05-06-19:29:11,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,cube,3,none,80,random,1,0.0318005,0.0318005,0.0318005,0,1,0.0421529,93071,0,1,dynamic
-2026-05-06-19:29:22,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,sphere,2,spherical,80,random,1,3.48961,3.48961,3.48961,0,1,3.59677,31364,0,1,dynamic
-2026-05-06-19:29:33,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,sphere,3,spherical,80,random,1,5.36856,5.36856,5.36856,0,1,5.34404,70139,0,1,dynamic
-2026-05-06-19:29:40,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,cube,2,spherical,80,random,1,3.72263,3.72263,3.72263,0,1,3.8765,42598,0,1,dynamic
-2026-05-06-19:29:51,linOct,PointsAoS,HilbertEncoder3D,10000000,neighborsPrune,cube,3,spherical,80,random,1,5.47185,5.47185,5.47185,0,1,5.48529,93071,0,1,dynamic
