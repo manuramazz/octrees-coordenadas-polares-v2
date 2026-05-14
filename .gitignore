@@ -7,6 +7,7 @@ heaptrack
 lib
 old
 out*
+results*
 prueba*
 logs
 plots/__pycache__
