@@ -671,7 +671,7 @@ protected:
     }
 
 public:    
-    using RangeFn = std::function<PrunedRange(uint32_t, const Point&, double, size_t)>;
+    using RangeFn = std::function<PrunedRange(uint32_t, const Point&, double, size_t, const Vector&)>;
 
     /**
      * @brief Builds the linear octree given an array of points, also reporting how much time each step takes
@@ -729,7 +729,7 @@ public:
 
         if (offsets[0] == 0) {
             // Root node is already a leaf
-            endpointAction(0);
+            endpointAction(0, 0);
             return;
         }
 
@@ -755,7 +755,7 @@ public:
                     assert(child < offsets.size() && "child index out of bounds for offsets");
                     if (offsets[child] == 0) {
                         // Leaf node reached
-                        endpointAction(child);
+                        endpointAction(child, currDepth);
                     } else {
                         assert(stackPos < 128);
                         stack[stackPos++] = {child, currDepth + 1};
@@ -800,7 +800,7 @@ public:
         };
         ///TODO: arreglar esta función
         resetFindAndInsertPointsAccumulators();
-        auto findAndInsertPoints = [&](uint32_t nodeIndex) {
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t dummy) {
             // Reached a leaf, add all points inside the kernel
             assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsStruct::findAndInsertPoints");
             assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
@@ -1062,7 +1062,7 @@ public:
         };
         
         resetFindAndInsertPointsAccumulators();
-        auto findAndInsertPoints = [&](uint32_t nodeIndex) {
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
             // Reached a leaf, add all points inside the kernel
             size_t startIndex = this->internalRanges[nodeIndex].first;
             size_t endIndex = this->internalRanges[nodeIndex].second;
@@ -1073,49 +1073,49 @@ public:
             // If getRange provided -> uses polar coords optimization
             // Only checks points inside range returned by bestRange (from octree_range_selector)
             if (getRange && sortedFlat && (endIndex - startIndex) > mainOptions.umbralPoda) {
-                assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
                 const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-                //std::cout << "Leaf n "<< leafIndex << ": [" << startIndex << ", " << endIndex << ")\n";
                 if (leafIndex >= 0) {
                     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.start();
                     }
-                    const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, (endIndex - startIndex));
+                    const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, (endIndex - startIndex), precomputedRadii[currDepth]);
                     if (mainOptions.debugLeavesTime) {
                         getRangeWatcher.stop();
                         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
                     }
+                    // Continue with the loop only if there was pruning, otherwise continue with the original loop
+                    if (range.count() < (endIndex - startIndex)) {
 
-                    //log de perm;
-                    if (mainOptions.debugLeavesTime) {
-                        loopWatcher.start();
-                    }
-                    const Point* leafPoints = sortedFlat->leafData(leafIndex, (endIndex - startIndex), static_cast<int>(range.order));
-                    for (size_t i = range.iMin; i < range.iMax; ++i) {
-                        const Point& p = leafPoints[i]; 
-                        if (k.isInside(p)) {
-                            ptsInside.push_back(p.id());
+                        //Loop with pruned range
+                        if (mainOptions.debugLeavesTime) {
+                            loopWatcher.start();
                         }
-                    }
-                    if (range.hasSecond) {
-                        for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                            const Point& p = leafPoints[i];
+                        const Point* leafPoints = sortedFlat->leafData(leafIndex, (endIndex - startIndex), static_cast<int>(range.order));
+                        for (size_t i = range.iMin; i < range.iMax; ++i) {
+                            const Point& p = leafPoints[i]; 
                             if (k.isInside(p)) {
                                 ptsInside.push_back(p.id());
                             }
                         }
+                        if (range.hasSecond) {
+                            for (size_t i = range.iMin2; i < range.iMax2; ++i) {
+                                const Point& p = leafPoints[i];
+                                if (k.isInside(p)) {
+                                    ptsInside.push_back(p.id());
+                                }
+                            }
+                        }
+                        if (mainOptions.debugLeavesTime) {
+                            loopWatcher.stop();
+                            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                        }
+                        if(mainOptions.debugRanges) {
+                            size_t neighborsFound = ptsInside.size() - sizeBefore;
+                            writeDetailedLeafRangeLog(leafIndex, getKernelName(k), range, mode, searchRadius, endIndex - startIndex, neighborsFound);
+                        }   
+                        return;
                     }
-                    if (mainOptions.debugLeavesTime) {
-                        loopWatcher.stop();
-                        accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                    }
-                    if(mainOptions.debugRanges) {
-                        size_t neighborsFound = ptsInside.size() - sizeBefore;
-                        writeDetailedLeafRangeLog(leafIndex, getKernelName(k), range, mode, searchRadius, endIndex - startIndex, neighborsFound);
-                    }   
-                    return;
-                    
                 }
             }
             if (mainOptions.debugLeavesTime) {
@@ -1159,7 +1159,7 @@ public:
         };
         
         resetFindAndInsertPointsAccumulators();
-        auto findAndInsertPoints = [&](uint32_t nodeIndex) {
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t dummy) {
             // Reached a leaf, add all points inside the kernel
 
             //POLAR COORD OPTIMIZACION
@@ -1464,7 +1464,7 @@ public:
             }
         };
         
-        auto findAndInsertPoints = [&](uint32_t nodeIndex) {
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t dummy) {
             // Reached a leaf, add all points inside the kernel
             assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsApprox::findAndInsertPoints");
             assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
@@ -1651,7 +1651,7 @@ public:
             return currDepth+1 <= max_level;
         };
         
-        auto logBoundsLeaf = [&](uint32_t nodeIndex) {
+        auto logBoundsLeaf = [&](uint32_t nodeIndex, uint32_t dummy) {
             
         };
         

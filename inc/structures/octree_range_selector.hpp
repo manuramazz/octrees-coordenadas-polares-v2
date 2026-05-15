@@ -17,6 +17,7 @@
 
 // ---------------------------------------------------------------
 
+const double UMBRAL_PCT_PODA = 0.5; // Si el rango seleccionado es menor que este porcentaje del total, se devuelve ese rango sin buscar en el resto de claves
 
 // ###########################################################################################
 // ###################### FUNCIÓN DE SELECCIÓN DE RANGO PARA POLAR/CARTESIAN ##################
@@ -66,15 +67,17 @@ PrunedRange computeRange(
         const double kMin = qCoord - halfRange;
         const double kMax = qCoord + halfRange;
 
-        // Optimización: si el rango cubre todo el array de claves, devolver full
-        // Las claves están ordenadas → keys.front() y keys.back() son los extremos
-        if (!keys.empty()) {
-            if (kMin <= keys.front() && kMax >= keys.back())
-                return full;
+        size_t iMin = 0;
+        // Solo hacemos búsqueda binaria si el mínimo del kernel corta los puntos
+        if (kMin > keys.front()) {
+            iMin = lowerIdx(kMin);
         }
-        
-        const size_t iMin = lowerIdx(kMin);
-        const size_t iMax = upperIdx(kMax);
+
+        size_t iMax = count;
+        // Solo hacemos búsqueda binaria si el máximo del kernel corta los puntos
+        if (kMax < keys.back()) {
+            iMax = upperIdx(kMax);
+        }
         return {iMin, iMax, 0, 0, false, order};
     }
 
@@ -116,21 +119,31 @@ PrunedRange bestRange(
     const Octree_t& octree,
     const Reordered_t& reordered,
     ReorderMode mode,
+    Vector leafRadii,
     bool logging = false)
 {
     const Point& center = octree.getLeafCenter(leaf);
-    const auto geo = detail::LeafQueryGeometry::compute(query, center, radius, kernel);
 
     PrunedRange best{0, count, 0, 0, false, OrderType::K0};
 
     if (mode == ReorderMode::Polar) {
+        const auto geo = detail::LeafQueryGeometry::computePolar(query, center, radius, kernel);
         best = computeRange(leaf, kernel, OrderType::K0, octree, count, reordered, mode, geo);
     }
     else if (mode == ReorderMode::Cartesian) {
+        const auto geo = detail::LeafQueryGeometry::computeCart(query, center, radius, kernel);
         for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
+            if(detail::kernelContainsLeafPerAxis(geo, leafRadii, order)){
+                continue;
+            }
             PrunedRange r = computeRange(leaf, kernel, order, octree, count, reordered, mode, geo);
-            if (r.count() < best.count())
+            const size_t rangeCount = r.count();
+            if (rangeCount < best.count()){
                 best = r;
+                if ((static_cast<double>(rangeCount) / count) <= UMBRAL_PCT_PODA){
+                    return best;
+                }
+            }
         }
     }
 

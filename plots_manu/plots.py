@@ -16,38 +16,43 @@ from itertools import product
 ##########################################################
 ################ GRAFICAS DE DEBUG RANGES ################
 ##########################################################
+import matplotlib.ticker as mticker
+
 def plot_pruning_points(csv_path: str, save: bool = False) -> None:
     df = pd.read_csv(csv_path)
     dataset_name = Path(csv_path).stem
 
-    # Detectar si hay columnas de configuración
+    # Detectar configuración
     has_threshold = 'threshold' in df.columns
     has_max_leaf  = 'maxPointsLeaf' in df.columns
 
-    # Construir etiqueta de configuración por fila
     def config_label(row):
         parts = []
-        if has_threshold:
-            parts.append(f'thr={int(row["threshold"])}')
-        if has_max_leaf:
-            parts.append(f'maxL={int(row["maxPointsLeaf"])}')
+        if has_threshold: parts.append(f'thr={int(row["threshold"])}')
+        if has_max_leaf:  parts.append(f'maxL={int(row["maxPointsLeaf"])}')
         return ' | '.join(parts) if parts else 'default'
 
     df['config'] = df.apply(config_label, axis=1)
     configs = df['config'].unique()
 
-    # Una figura por modo × config
+    # Agregamos vecinos (neighbours) a la agrupación
     best_all = df.loc[df.groupby(
         ['leaf', 'kernel', 'mode', 'radius', 'config'])['count'].idxmin()
     ].copy()
-    best_all['pruned'] = best_all['total'] - best_all['count']
 
     agg = (
         best_all.groupby(['mode', 'kernel', 'radius', 'config'])
-        .agg(total_pts=('total', 'sum'), evaluated_pts=('count', 'sum'))
+        .agg(
+            total_pts=('total', 'sum'), 
+            evaluated_pts=('count', 'sum'),
+            neighbor_pts=('neighbours', 'sum') # Nueva columna de vecinos reales
+        )
         .reset_index()
     )
-    agg['pct_pruned'] = (1 - agg['evaluated_pts'] / agg['total_pts']) * 100
+    
+    # Porcentajes solicitados
+    agg['pct_evaluated'] = (agg['evaluated_pts'] / agg['total_pts']) * 100
+    agg['pct_neighbors_total'] = (agg['neighbor_pts'] / agg['total_pts']) * 100
 
     modes   = agg['mode'].unique()
     kernels = sorted(agg['kernel'].unique())
@@ -58,83 +63,87 @@ def plot_pruning_points(csv_path: str, save: bool = False) -> None:
             df_mode = agg[(agg['mode'] == mode) & (agg['config'] == config)]
             best    = best_all[(best_all['mode'] == mode) & (best_all['config'] == config)]
 
-            if df_mode.empty:
-                continue
+            if df_mode.empty: continue
 
-            n_kernels   = len(kernels)
-            n_radii     = len(radii)
-            group_width = 0.8
-            bar_width   = group_width / (n_radii * 2)
+            n_kernels = len(kernels)
+            n_radii   = len(radii)
+            
+            # Ajuste de anchos para 3 barras (Total, Evaluated, Neighbors)
+            group_width = 0.85
+            bar_width   = group_width / (n_radii * 3.5) 
 
             x = np.arange(n_kernels)
-            colors_total = plt.cm.Blues(np.linspace(0.4, 0.8, n_radii))
-            colors_eval  = plt.cm.Oranges(np.linspace(0.4, 0.8, n_radii))
+            colors_total = plt.cm.Blues(np.linspace(0.4, 0.7, n_radii))
+            colors_eval  = plt.cm.Oranges(np.linspace(0.4, 0.7, n_radii))
+            colors_neigh = plt.cm.Greens(np.linspace(0.4, 0.7, n_radii))
 
-            fig, ax = plt.subplots(figsize=(max(10, n_kernels * 3), 6))
+            fig, ax = plt.subplots(figsize=(max(12, n_kernels * 3), 7))
 
             for ri, radius in enumerate(radii):
                 df_r = df_mode[df_mode['radius'] == radius].set_index('kernel')
 
-                offset_total = (ri * 2 - (n_radii - 1)) * bar_width - bar_width / 2
-                offset_eval  = offset_total + bar_width
+                # Centro del grupo para este radio dentro del kernel
+                # Desplazamiento para el trío de barras
+                base_offset = (ri - (n_radii - 1) / 2) * (bar_width * 3.8)
+                
+                offset_total = base_offset - bar_width
+                offset_eval  = base_offset
+                offset_neigh = base_offset + bar_width
 
                 totals    = [df_r.loc[k, 'total_pts']     if k in df_r.index else 0 for k in kernels]
                 evaluated = [df_r.loc[k, 'evaluated_pts'] if k in df_r.index else 0 for k in kernels]
-                pcts      = [df_r.loc[k, 'pct_pruned']    if k in df_r.index else 0 for k in kernels]
+                neighbors = [df_r.loc[k, 'neighbor_pts']  if k in df_r.index else 0 for k in kernels]
+                
+                pct_eval  = [df_r.loc[k, 'pct_evaluated']      if k in df_r.index else 0 for k in kernels]
+                pct_neigh = [df_r.loc[k, 'pct_neighbors_total'] if k in df_r.index else 0 for k in kernels]
 
-                mean_L_by_kernel = (
-                    best[best['radius'] == radius]
-                    .groupby('kernel')['L']
-                    .mean()
-                )
+                # Dibujo de barras
+                ax.bar(x + offset_total, totals, bar_width, label=f'r={radius} Total',
+                       color=colors_total[ri], edgecolor='black', linewidth=0.3)
+                
+                bars_ev = ax.bar(x + offset_eval, evaluated, bar_width, label=f'r={radius} Evaluados',
+                                 color=colors_eval[ri], edgecolor='black', linewidth=0.3)
+                
+                bars_ne = ax.bar(x + offset_neigh, neighbors, bar_width, label=f'r={radius} Vecinos',
+                                 color=colors_neigh[ri], edgecolor='black', linewidth=0.3)
 
-                ax.bar(x + offset_total, totals, bar_width,
-                       label=f'r={radius} total',
-                       color=colors_total[ri], edgecolor='white', linewidth=0.5)
-                bars_e = ax.bar(x + offset_eval, evaluated, bar_width,
-                                label=f'r={radius} evaluados',
-                                color=colors_eval[ri], edgecolor='white', linewidth=0.5)
-
-                for ki, (bar, pct, k) in enumerate(zip(bars_e, pcts, kernels)):
-                    if pct > 0:
-                        ax.text(bar.get_x() + bar.get_width() / 2,
-                                bar.get_height() * 1.01,
-                                f'{pct:.1f}%',
-                                ha='center', va='bottom', fontsize=7, color='black')
-
-                    mean_L = mean_L_by_kernel.get(k, None)
-                    if mean_L and mean_L > 0:
-                        ratio = radius / mean_L
-                        ax.text(bar.get_x() + bar.get_width() / 2,
-                                -ax.get_ylim()[1] * 0.06,
-                                f'R/L={ratio:.2f}',
-                                ha='center', va='top', fontsize=6, color='gray',
-                                rotation=20)
+                # Etiquetas de porcentaje arriba de barras
+                for bi, bar in enumerate(bars_ev):
+                    if pct_eval[bi] > 0:
+                        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
+                                f'{pct_eval[bi]:.1f}%', ha='center', va='bottom', 
+                                fontsize=7, rotation=90)
+                
+                for bi, bar in enumerate(bars_ne):
+                    if pct_neigh[bi] > 0:
+                        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
+                                f'{pct_neigh[bi]:.1f}%', ha='center', va='bottom', 
+                                fontsize=7, color='darkgreen', rotation=90)
 
             ax.set_xticks(x)
             ax.set_xticklabels([k.upper() for k in kernels], fontsize=11)
-            ax.tick_params(axis='x', pad=28)
-            ax.set_xlabel('Kernel', fontsize=12)
-            ax.set_ylabel('Puntos', fontsize=12)
+            
+            ax.set_ylabel('Nº de Puntos (Escala Log)', fontsize=12)
             ax.yaxis.set_major_formatter(mticker.FuncFormatter(
-                lambda val, _: f'{val/1e6:.1f}M' if val >= 1e6 else f'{val/1e3:.0f}K'))
-            ax.set_title(
-                f'Puntos totales vs evaluados con poda\n'
-                f'Dataset: {dataset_name}   Modo: {mode}   Config: {config}',
-                fontsize=13, fontweight='bold')
-            ax.legend(ncol=n_radii, fontsize=8, loc='upper right')
-            ax.grid(axis='y', alpha=0.3)
-            ax.spines[['top', 'right']].set_visible(False)
+                lambda val, _: f'{val/1e6:.1f}M' if val >= 1e6 else f'{val/1e3:.0f}K' if val >= 1e3 else f'{val:.0f}'))
+            
+            ax.set_title(f'Puntos: Total vs Evaluados (Poda) vs Vecinos Reales\n'
+                         f'Dataset: {dataset_name} | Modo: {mode} | {config}', fontsize=12, fontweight='bold')
+            
+            # Leyenda fuera para no tapar barras
+            ax.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=8, ncol=1)
+            ax.grid(axis='y', which='both', alpha=0.2)
+            
             plt.tight_layout()
-            plt.show()
+            plt.show() # Muestra la gráfica
 
             if save:
                 safe_config = config.replace(' | ', '_').replace('=', '')
-                out_path = Path(csv_path).parent / \
-                    f'{dataset_name}_{mode}_{safe_config}_pruning_points.png'
-                plt.savefig(out_path, dpi=150, bbox_inches='tight')
-                plt.close()
+                out_path = Path(csv_path).parent / f'{dataset_name}_{mode}_{safe_config}_efficiency.png'
+                fig.savefig(out_path, dpi=150, bbox_inches='tight')
                 print(f'Guardado: {out_path}')
+            
+            plt.close(fig) # SOLUCIÓN: Cierra explícitamente para limpiar memoria
 
 def plot_pruning_distribution(csv_path: str, save: bool = False) -> None:
     df = pd.read_csv(csv_path)
@@ -253,6 +262,7 @@ def plot_pruning_distribution(csv_path: str, save: bool = False) -> None:
             plt.savefig(out_path, dpi=150, bbox_inches='tight')
             plt.close()
             print(f'Guardado: {out_path}')
+        plt.close(fig)
 
 def plot_density_analysis(csv_path, save: bool = False) -> None:
     df = pd.read_csv(csv_path)
@@ -337,6 +347,7 @@ def plot_density_analysis(csv_path, save: bool = False) -> None:
     if save:
         plt.savefig(f"{dataset_name}_pro_density_analysis.png", dpi=200, bbox_inches='tight')
     plt.show()
+    plt.close(fig)
 
 
 def plot_key_distribution(csv_path: str, save: bool = False) -> None:
@@ -436,6 +447,7 @@ def plot_key_distribution(csv_path: str, save: bool = False) -> None:
             plt.savefig(out_path, dpi=150, bbox_inches='tight')
             plt.close()
             print(f'Guardado: {out_path}')
+        plt.close(fig)
 
 
 
@@ -544,6 +556,7 @@ def analyze_speedup_and_timing(csv_path: str, save: bool = False, filename: str 
             plt.savefig(out_path, dpi=150, bbox_inches='tight')
             plt.close()
             print(f'Guardado: {out_path}')
+        plt.close(fig)
 
 
 ##########################################################

@@ -5,8 +5,8 @@
 #SBATCH -n 1                 # Un solo "task" (tu script de bash)
 #SBATCH -c 2                # Núcleos
 #SBATCH --mem=40G            # Memoria RAM (ajusta según el peso de Semantic3D)
-#SBATCH -t 06:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
-#SBATCH -J debug_octree_leaves_v4    # Nombre del trabajo
+#SBATCH -t 04:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
+#SBATCH -J debug_octree_leaves_v5    # Nombre del trabajo
 #SBATCH -o logs/bench_%j.out # Archivo de salida (crea la carpeta logs antes)
 #SBATCH -e logs/bench_%j.err # Archivo de errores
 #SBATCH --mail-type=END,FAIL # Notificar al finalizar o si falla

@@ -36,9 +36,12 @@ Luego hacer experimento modificando los parámetros hablados
 - implementar forma de hints alternativa ?? (creo que no)
 - DONE preparar experimento!!!
 
-RESUMEN FLUJO:
-1. CONSTRUCCIÓN 
- - D
- - KJ
-2. Cara
+PLAN 15/06
+- DONE early exit cartesian
+- DONE optimizar binary search
+- DONE salida de emergencia
+- mandar correo a tutores
+- a futuro: comparar max-leaf y umbral-poda en tiempos totales
 
+- arreglar circumplejo
+- no se? quizas preparar graficas de tiempos finales?

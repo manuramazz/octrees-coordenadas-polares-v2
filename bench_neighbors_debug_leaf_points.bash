@@ -1,5 +1,5 @@
 # setup
-FOLDER="outv4-leaves"
+FOLDER="outv5-leaves"
 set -e
 mkdir -p "$FOLDER"
 
