@@ -1,5 +1,9 @@
 #!/bin/bash
 
+module purge
+module load gcc/12.3.0
+module load papi
+
 rm -rf build
 mkdir -p build && cd build
 mkdir -p ~/compilacion_temporal
