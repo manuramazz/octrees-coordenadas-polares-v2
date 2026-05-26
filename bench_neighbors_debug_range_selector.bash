@@ -1,5 +1,5 @@
 # setup
-FOLDER="outv5-ranges"
+FOLDER="outv6-ranges"
 set -e
 mkdir -p "$FOLDER"
 
@@ -15,7 +15,7 @@ datasets_high_density=(
     #"data/speulderbos/Speulderbos_2017_TLS.las"
 )
 MAX_POINTS_LEAF=(128, 256, 512)
-UMBRALES_PODA=(8, 16, 32)
+UMBRALES_PODA=(32)
 N_SEARCHES="60"
 ALGO="neighborsPrune"
 

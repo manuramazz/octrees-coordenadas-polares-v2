@@ -463,12 +463,65 @@ class NeighborsBenchmark {
                 auto neighborsSearchPrune = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
-                    const SortedDataFlat* sortedFlatPtr = (mode != ReorderMode::None) ? &reordered.getSortedFlat() : nullptr;
-                    #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
-                        for(size_t i = 0; i<searchSet.numSearches; i++) {
-                            auto result = oct.template neighborsPrune<kernel>(points[searchIndexes[i]], radius, getRange, mode, sortedFlatPtr);
-                            averageResultSize += result.size();
+                    // Enviar a la función adecuada en función de la reordenación, o de si hay un modo debug habilitado
+                    if(mainOptions.debugRanges){
+                        if(mode == ReorderMode::Polar){
+                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                                for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                    auto result = oct.template neighborsPrunePolarRangesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                    averageResultSize += result.size();
+                                }
+                        }else if(mode == ReorderMode::Cartesian){
+                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                                for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                    auto result = oct.template neighborsPruneCartesianRangesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                    averageResultSize += result.size();
+                                }
+                        }else{
+                            std::cout << "Debug ranges enabled but reorder mode is none, skipping search!\n";
                         }
+                    }else if (mainOptions.debugLeavesTime){
+                        if(mode == ReorderMode::Polar){
+                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                                for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                    auto result = oct.template neighborsPrunePolarTimesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                    averageResultSize += result.size();
+                                }
+                        }else if(mode == ReorderMode::Cartesian){
+                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                                for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                    auto result = oct.template neighborsPruneCartesianTimesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                    averageResultSize += result.size();
+                                }
+                        }else{
+                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                                for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                    auto result = oct.template neighborsPruneNoneTimesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                    averageResultSize += result.size();
+                                }
+                        }
+                    }else{
+                        if(mode == ReorderMode::Polar){
+                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                                for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                    auto result = oct.template neighborsPrunePolar<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                    averageResultSize += result.size();
+                                }
+                        }else if(mode == ReorderMode::Cartesian){
+                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                                for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                    auto result = oct.template neighborsPruneCartesian<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                    averageResultSize += result.size();
+                                }
+                        }else{
+                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                                for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                    auto result = oct.template neighborsPrune<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                    averageResultSize += result.size();
+                                }
+                        }
+                    }
+
                     averageResultSize /= searchSet.numSearches;
                     searchSet.nextRepeat();
                     return averageResultSize;
@@ -697,6 +750,7 @@ class NeighborsBenchmark {
                         // Measure time taken by reordering to include it in the logs
                         auto startTime = std::chrono::high_resolution_clock::now();
                         reordered.buildLeafPermutations(oct, points, mode);
+                        oct.setReorderedVectors(reordered.getSortedFlat());
                         auto endTime = std::chrono::high_resolution_clock::now();
                         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
                         std::cout << "[LOG] Reordering completed in " << duration << " ms.\n";

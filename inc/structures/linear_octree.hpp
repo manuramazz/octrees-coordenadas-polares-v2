@@ -152,6 +152,14 @@ protected:
      * encodings. Therefore, this array is altered inside this class. This is done to  locality that Morton/Hilbert
      */
     Container &points;
+    /**
+     * @brief A pointer to the reordered points vector.
+     * @details These vectores are created in buildSortedDataFlat, and contain the points sorted in the order of the keys for each leaf, so they are not sorted globally but only locally in each leaf.
+     */
+    const Point* polarPoints = nullptr;
+    const Point* cartesianPointsX = nullptr;
+    const Point* cartesianPointsY = nullptr;
+    const Point* cartesianPointsZ = nullptr;
 
     /// @brief The global bounding box of the octree
     Box box;
@@ -168,8 +176,6 @@ protected:
     mutable std::optional<std::filesystem::path> rangeTimingLogPath;
     mutable bool rangeTimingLogHeaderWritten = false;
     mutable bool rangeDebugHeaderWritten = false;
-
-
 
     /**
      * @brief Computes the rebalacing decisions as the first process in the subdivision of the leaves array
@@ -671,8 +677,6 @@ protected:
     }
 
 public:    
-    using RangeFn = std::function<PrunedRange(uint32_t, const Point&, double, size_t, const Vector&)>;
-
     /**
      * @brief Builds the linear octree given an array of points, also reporting how much time each step takes
      * 
@@ -688,6 +692,16 @@ public:
         static_assert(!std::is_same_v<std::decay_t<PointEncoder>, PointEncoding::NoEncoding>,
             "Encoder cannot be an instance of NoEncoding when using LinearOctree.");
         buildOctree(log);
+    }
+
+    using RangeFn = std::function<PrunedRange(uint32_t, const Point&, double, size_t, const Vector&)>;
+
+    /// @brief A helper function to set the pointers to the reordered vectors after they are built in OctreeReordered
+    void setReorderedVectors(const SortedDataFlat& sortedFlat) {
+        this->polarPoints = sortedFlat.PointsPolar.data();
+        this->cartesianPointsX = sortedFlat.PointsX.data();
+        this->cartesianPointsY = sortedFlat.PointsY.data();
+        this->cartesianPointsZ = sortedFlat.PointsZ.data();
     }
 
     /// @brief Returns the memory overhead of the octree (points cloud or codes are not counted)
@@ -1022,15 +1036,60 @@ public:
         }
     }
 
-    /**
+
+    /** ##############################################################################################################################
+     * ############################  ALGORITMO PRUNE CON TODAS LAS VERSIONES PARA REORDENACIONES #####################################
+     * ##############################################################################################################################
      * @brief Search neighbors function. Given kernel that already contains a point and a radius, return the points inside the region.
      * Note that neighborsStruct is generally faster, so only use this function if you don't want your result encapsultated on NeighborSet.
      * 
      * @param k specific kernel that contains the data of the region (center and radius)
      * @return Points inside the given kernel type.
      */
+    // Original
     template<typename Kernel>
-    [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None, const SortedDataFlat* sortedFlat = nullptr) const {
+    [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k) const {
+        std::vector<size_t> ptsInside;
+        auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            auto nodeCenter = this->centers[nodeIndex];
+            auto nodeRadii = this->precomputedRadii[currDepth];
+            switch (k.boxIntersect(nodeCenter, nodeRadii)) {
+                case KernelAbstract::IntersectionJudgement::INSIDE: {
+                    // Completely inside, all add points and prune
+                    size_t startIndex = this->internalRanges[nodeIndex].first;
+                    size_t endIndex = this->internalRanges[nodeIndex].second;
+                    for (size_t i = startIndex; i < endIndex; ++i) {
+                        ptsInside.push_back(i);
+                    }
+                    return false;
+                }
+                case KernelAbstract::IntersectionJudgement::OVERLAP:
+                    // Overlaps but not inside, keep descending
+                    return true;
+                default:
+                    // Completely outside, prune
+                    return false;
+            }
+        };
+        
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t dummy) {
+            // Reached a leaf, add all points inside the kernel
+            size_t startIndex = this->internalRanges[nodeIndex].first;
+            size_t endIndex = this->internalRanges[nodeIndex].second;
+            for (size_t i = startIndex; i < endIndex; ++i) {
+                if (k.isInside(points[i])) {
+                    ptsInside.push_back(i);
+                }
+            }
+        };
+        
+        singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        return ptsInside;
+	}
+
+    // Polar coords opt
+    template<typename Kernel>
+    [[nodiscard]] std::vector<size_t> neighborsPrunePolar(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Polar) const {
         std::vector<size_t> ptsInside;
         const double searchRadius = k.radii().getX();
         auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
@@ -1061,78 +1120,553 @@ public:
             }
         };
         
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            const size_t startIndex = this->internalRanges[nodeIndex].first;
+            const size_t endIndex = this->internalRanges[nodeIndex].second;
+            const size_t count = endIndex - startIndex;
+
+            if (count <= mainOptions.umbralPoda) {
+                for (size_t i = startIndex; i < endIndex; ++i) {
+                    if (k.isInside(this->polarPoints[i])) {
+                        ptsInside.push_back(i);
+                    }
+                }
+                return;
+            }
+
+            const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+            if (leafIndex >= 0) {
+                // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
+                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+
+                // Si hubo poda real, escaneamos los intervalos óptimos sobre el puntero polar
+                if (range.count() < count) {
+                    // Primer intervalo podado (Aritmética de punteros directa, prefetcher impecable)
+                    for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
+                        if (k.isInside(this->polarPoints[i])) {
+                            ptsInside.push_back(i);
+                        }
+                    }
+                    // Segundo intervalo podado (Wrap-around angular)
+                    if (range.hasSecond) {
+                        for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
+                            if (k.isInside(this->polarPoints[i])) {
+                                ptsInside.push_back(i);
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+
+            // Fallback si la búsqueda binaria no pudo podar nada: recorremos secuencialmente polarData
+            // para mantener la integridad de los índices y evitar mezclas espaciales.
+            for (size_t i = startIndex; i < endIndex; ++i) {
+                if (k.isInside(this->polarPoints[i])) {
+                    ptsInside.push_back(i);
+                }
+            }
+            return;
+        };
+        singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        return ptsInside;
+	}
+
+
+    // Cartesian coords opt
+    template<typename Kernel>
+    [[nodiscard]] std::vector<size_t> neighborsPruneCartesian(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Cartesian) const {
+        std::vector<size_t> ptsInside;
+        const double searchRadius = k.radii().getX();
+        auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::checkBoxIntersect");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(currDepth < this->precomputedRadii.size() && "currDepth out of bounds for precomputedRadii");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
+            auto nodeCenter = this->centers[nodeIndex];
+            auto nodeRadii = this->precomputedRadii[currDepth];
+            switch (k.boxIntersect(nodeCenter, nodeRadii)) {
+                case KernelAbstract::IntersectionJudgement::INSIDE: {
+                    // Completely inside, all add points and prune
+                    size_t startIndex = this->internalRanges[nodeIndex].first;
+                    size_t endIndex = this->internalRanges[nodeIndex].second;
+                    assert(startIndex <= endIndex && "invalid range in internalRanges");
+                    assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+                    for (size_t i = startIndex; i < endIndex; ++i) {
+                        ptsInside.push_back(i);
+                    }
+                    return false;
+                }
+                case KernelAbstract::IntersectionJudgement::OVERLAP:
+                    // Overlaps but not inside, keep descending
+                    return true;
+                default:
+                    // Completely outside, prune
+                    return false;
+            }
+        };
+        
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            const size_t startIndex = this->internalRanges[nodeIndex].first;
+            const size_t endIndex = this->internalRanges[nodeIndex].second;
+            const size_t count = endIndex - startIndex;
+
+            if (count <= mainOptions.umbralPoda) {
+                for (size_t i = startIndex; i < endIndex; ++i) {
+                    if (k.isInside(this->points[i])) {
+                        ptsInside.push_back(i);
+                    }
+                }
+                return;
+            }
+
+            const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+            if (leafIndex >= 0) {
+                // Evaluamos el mejor rango entre X, Y y Z
+                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+
+                if (range.count() < count) {
+                    // Selección del puntero crudo del eje óptimo en O(1)
+                    const Point* axisData = nullptr;
+                    if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
+                    else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
+                    else                                   axisData = this->cartesianPointsZ;
+
+                    // Bucle de escaneo lineal sobre el eje óptimo podado
+                    for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
+                        const Point& p = axisData[i];
+                        if (k.isInside(p)) {
+                            ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
+                        }
+                    }
+                    return;
+                }
+            }
+
+            // Fallback de rescate si ningún eje cartesiano podó la hoja (recorremos el vector base del Octree)
+            for (size_t i = startIndex; i < endIndex; ++i) {
+                if (k.isInside(this->points[i])) {
+                    ptsInside.push_back(i);
+                }
+            }
+        };
+        singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        return ptsInside;
+	}
+
+    // RANGES DEBUG -> Polar coords opt
+    template<typename Kernel>
+    [[nodiscard]] std::vector<size_t> neighborsPrunePolarRangesDebug(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Polar) const {
+        std::vector<size_t> ptsInside;
+        const double searchRadius = k.radii().getX();
+        auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::checkBoxIntersect");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(currDepth < this->precomputedRadii.size() && "currDepth out of bounds for precomputedRadii");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
+            auto nodeCenter = this->centers[nodeIndex];
+            auto nodeRadii = this->precomputedRadii[currDepth];
+            switch (k.boxIntersect(nodeCenter, nodeRadii)) {
+                case KernelAbstract::IntersectionJudgement::INSIDE: {
+                    // Completely inside, all add points and prune
+                    size_t startIndex = this->internalRanges[nodeIndex].first;
+                    size_t endIndex = this->internalRanges[nodeIndex].second;
+                    assert(startIndex <= endIndex && "invalid range in internalRanges");
+                    assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+                    for (size_t i = startIndex; i < endIndex; ++i) {
+                        ptsInside.push_back(i);
+                    }
+                    return false;
+                }
+                case KernelAbstract::IntersectionJudgement::OVERLAP:
+                    // Overlaps but not inside, keep descending
+                    return true;
+                default:
+                    // Completely outside, prune
+                    return false;
+            }
+        };
+        
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            const size_t startIndex = this->internalRanges[nodeIndex].first;
+            const size_t endIndex = this->internalRanges[nodeIndex].second;
+            const size_t count = endIndex - startIndex;
+            const size_t sizeBefore = ptsInside.size();
+
+            if (count <= mainOptions.umbralPoda) {
+                for (size_t i = startIndex; i < endIndex; ++i) {
+                    if (k.isInside(this->polarPoints[i])) {
+                        ptsInside.push_back(i);
+                    }
+                }
+                return;
+            }
+
+            const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+            if (leafIndex >= 0) {
+                // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
+                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+
+                // Entramos siempre para poder loggear el rango aunque no haya poda
+                for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
+                    if (k.isInside(this->polarPoints[i])) {
+                        ptsInside.push_back(i);
+                    }
+                }
+                // Segundo intervalo podado (Wrap-around angular)
+                if (range.hasSecond) {
+                    for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
+                        if (k.isInside(this->polarPoints[i])) {
+                            ptsInside.push_back(i);
+                        }
+                    }
+                }
+                if(mainOptions.debugRanges) {
+                    size_t neighborsFound = ptsInside.size() - sizeBefore;
+                    writeDetailedLeafRangeLog(leafIndex, getKernelName(k), range, mode, searchRadius, endIndex - startIndex, neighborsFound);
+                }   
+                return;
+            }
+
+            // Fallback si la búsqueda binaria no pudo podar nada: recorremos secuencialmente polarData
+            // para mantener la integridad de los índices y evitar mezclas espaciales.
+            for (size_t i = startIndex; i < endIndex; ++i) {
+                if (k.isInside(this->polarPoints[i])) {
+                    ptsInside.push_back(i);
+                }
+            }
+            return;
+        };
+        singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        return ptsInside;
+	}
+
+    // RANGES DEBUG- > Cartesian coords opt
+    template<typename Kernel>
+    [[nodiscard]] std::vector<size_t> neighborsPruneCartesianRangesDebug(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Cartesian) const {
+        std::vector<size_t> ptsInside;
+        const double searchRadius = k.radii().getX();
+        auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::checkBoxIntersect");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(currDepth < this->precomputedRadii.size() && "currDepth out of bounds for precomputedRadii");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
+            auto nodeCenter = this->centers[nodeIndex];
+            auto nodeRadii = this->precomputedRadii[currDepth];
+            switch (k.boxIntersect(nodeCenter, nodeRadii)) {
+                case KernelAbstract::IntersectionJudgement::INSIDE: {
+                    // Completely inside, all add points and prune
+                    size_t startIndex = this->internalRanges[nodeIndex].first;
+                    size_t endIndex = this->internalRanges[nodeIndex].second;
+                    assert(startIndex <= endIndex && "invalid range in internalRanges");
+                    assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+                    for (size_t i = startIndex; i < endIndex; ++i) {
+                        ptsInside.push_back(i);
+                    }
+                    return false;
+                }
+                case KernelAbstract::IntersectionJudgement::OVERLAP:
+                    // Overlaps but not inside, keep descending
+                    return true;
+                default:
+                    // Completely outside, prune
+                    return false;
+            }
+        };
+        
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            const size_t startIndex = this->internalRanges[nodeIndex].first;
+            const size_t endIndex = this->internalRanges[nodeIndex].second;
+            const size_t count = endIndex - startIndex;
+            const size_t sizeBefore = ptsInside.size();
+
+
+            if (count <= mainOptions.umbralPoda) {
+                for (size_t i = startIndex; i < endIndex; ++i) {
+                    if (k.isInside(this->points[i])) {
+                        ptsInside.push_back(i);
+                    }
+                }
+                return;
+            }
+
+            const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+            if (leafIndex >= 0) {
+                // Evaluamos el mejor rango entre X, Y y Z
+                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+
+                // Selección del puntero crudo del eje óptimo en O(1)
+                const Point* axisData = nullptr;
+                if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
+                else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
+                else                                   axisData = this->cartesianPointsZ;
+
+                // Bucle de escaneo lineal sobre el eje óptimo podado
+                for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
+                    const Point& p = axisData[i];
+                    if (k.isInside(p)) {
+                        ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
+                    }
+                }
+                if(mainOptions.debugRanges) {
+                    size_t neighborsFound = ptsInside.size() - sizeBefore;
+                    writeDetailedLeafRangeLog(leafIndex, getKernelName(k), range, mode, searchRadius, endIndex - startIndex, neighborsFound);
+                }
+                return;
+            }
+
+            // Fallback de rescate si ningún eje cartesiano podó la hoja (recorremos el vector base del Octree)
+            for (size_t i = startIndex; i < endIndex; ++i) {
+                if (k.isInside(this->points[i])) {
+                    ptsInside.push_back(i);
+                }
+            }
+        };
+        singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        return ptsInside;
+	}
+
+    // LEAF TIMES DEBUG -> Polar coords opt
+    template<typename Kernel>
+    [[nodiscard]] std::vector<size_t> neighborsPrunePolarTimesDebug(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Polar) const {
+        std::vector<size_t> ptsInside;
+        const double searchRadius = k.radii().getX();
+        auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::checkBoxIntersect");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(currDepth < this->precomputedRadii.size() && "currDepth out of bounds for precomputedRadii");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
+            auto nodeCenter = this->centers[nodeIndex];
+            auto nodeRadii = this->precomputedRadii[currDepth];
+            switch (k.boxIntersect(nodeCenter, nodeRadii)) {
+                case KernelAbstract::IntersectionJudgement::INSIDE: {
+                    // Completely inside, all add points and prune
+                    size_t startIndex = this->internalRanges[nodeIndex].first;
+                    size_t endIndex = this->internalRanges[nodeIndex].second;
+                    assert(startIndex <= endIndex && "invalid range in internalRanges");
+                    assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+                    for (size_t i = startIndex; i < endIndex; ++i) {
+                        ptsInside.push_back(i);
+                    }
+                    return false;
+                }
+                case KernelAbstract::IntersectionJudgement::OVERLAP:
+                    // Overlaps but not inside, keep descending
+                    return true;
+                default:
+                    // Completely outside, prune
+                    return false;
+            }
+        };
+        resetFindAndInsertPointsAccumulators();       
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            const size_t startIndex = this->internalRanges[nodeIndex].first;
+            const size_t endIndex = this->internalRanges[nodeIndex].second;
+            const size_t count = endIndex - startIndex;
+            TimeWatcher getRangeWatcher;
+            TimeWatcher loopWatcher;
+            if (count <= mainOptions.umbralPoda) {
+                loopWatcher.start();
+                for (size_t i = startIndex; i < endIndex; ++i) {
+                    if (k.isInside(this->polarPoints[i])) {
+                        ptsInside.push_back(i);
+                    }
+                }
+                loopWatcher.stop();
+                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                return;
+            }
+
+            const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+            if (leafIndex >= 0) {
+                // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
+                getRangeWatcher.start();
+                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+                getRangeWatcher.stop();
+                accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();               
+                // Si hubo poda real, escaneamos los intervalos óptimos sobre el puntero polar
+                if (range.count() < count) {
+                    // Primer intervalo podado (Aritmética de punteros directa, prefetcher impecable)
+                    loopWatcher.start();
+                    for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
+                        if (k.isInside(this->polarPoints[i])) {
+                            ptsInside.push_back(i);
+                        }
+                    }
+                    // Segundo intervalo podado (Wrap-around angular)
+                    if (range.hasSecond) {
+                        for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
+                            if (k.isInside(this->polarPoints[i])) {
+                                ptsInside.push_back(i);
+                            }
+                        }
+                    }
+                    loopWatcher.stop();
+                    accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                    return;
+                }
+            }
+
+            // Fallback si la búsqueda binaria no pudo podar nada: recorremos secuencialmente polarData
+            // para mantener la integridad de los índices y evitar mezclas espaciales.
+            loopWatcher.start();
+            for (size_t i = startIndex; i < endIndex; ++i) {
+                if (k.isInside(this->polarPoints[i])) {
+                    ptsInside.push_back(i);
+                }
+            }
+            loopWatcher.stop();
+            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+            return;
+        };
+        singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
+        return ptsInside;
+	}
+
+
+    // LEAF TIMES DEBUG -> Cartesian coords opt
+    template<typename Kernel>
+    [[nodiscard]] std::vector<size_t> neighborsPruneCartesianTimesDebug(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Cartesian) const {
+        std::vector<size_t> ptsInside;
+        const double searchRadius = k.radii().getX();
+        auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighborsPrune::checkBoxIntersect");
+            assert(nodeIndex < this->centers.size() && "nodeIndex out of bounds for centers");
+            assert(currDepth < this->precomputedRadii.size() && "currDepth out of bounds for precomputedRadii");
+            assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
+            auto nodeCenter = this->centers[nodeIndex];
+            auto nodeRadii = this->precomputedRadii[currDepth];
+            switch (k.boxIntersect(nodeCenter, nodeRadii)) {
+                case KernelAbstract::IntersectionJudgement::INSIDE: {
+                    // Completely inside, all add points and prune
+                    size_t startIndex = this->internalRanges[nodeIndex].first;
+                    size_t endIndex = this->internalRanges[nodeIndex].second;
+                    assert(startIndex <= endIndex && "invalid range in internalRanges");
+                    assert(endIndex <= points.size() && "internalRanges points end out of bounds");
+                    for (size_t i = startIndex; i < endIndex; ++i) {
+                        ptsInside.push_back(i);
+                    }
+                    return false;
+                }
+                case KernelAbstract::IntersectionJudgement::OVERLAP:
+                    // Overlaps but not inside, keep descending
+                    return true;
+                default:
+                    // Completely outside, prune
+                    return false;
+            }
+        };
         resetFindAndInsertPointsAccumulators();
         auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            const size_t startIndex = this->internalRanges[nodeIndex].first;
+            const size_t endIndex = this->internalRanges[nodeIndex].second;
+            const size_t count = endIndex - startIndex;
+            TimeWatcher getRangeWatcher;
+            TimeWatcher loopWatcher;
+
+            if (count <= mainOptions.umbralPoda) {
+                loopWatcher.start();
+                for (size_t i = startIndex; i < endIndex; ++i) {
+                    if (k.isInside(this->points[i])) {
+                        ptsInside.push_back(i);
+                    }
+                }
+                loopWatcher.stop();
+                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                return;
+            }
+
+            const int32_t leafIndex = this->internalToLeaf[nodeIndex];
+            if (leafIndex >= 0) {
+                // Evaluamos el mejor rango entre X, Y y Z
+                getRangeWatcher.start();
+                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+                getRangeWatcher.stop();
+                accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
+
+                if (range.count() < count) {
+                    // Selección del puntero crudo del eje óptimo en O(1)
+                    loopWatcher.start();
+                    const Point* axisData = nullptr;
+                    if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
+                    else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
+                    else                                   axisData = this->cartesianPointsZ;
+
+                    // Bucle de escaneo lineal sobre el eje óptimo podado
+                    for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
+                        const Point& p = axisData[i];
+                        if (k.isInside(p)) {
+                            ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
+                        }
+                    }
+                    loopWatcher.stop();
+                    accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+                    return;
+                }
+            }
+
+            // Fallback de rescate si ningún eje cartesiano podó la hoja (recorremos el vector base del Octree)
+            loopWatcher.start();
+            for (size_t i = startIndex; i < endIndex; ++i) {
+                if (k.isInside(this->points[i])) {
+                    ptsInside.push_back(i);
+                }
+            }
+            loopWatcher.stop();
+            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+            return;
+        };
+        singleTraversal(checkBoxIntersect, findAndInsertPoints);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
+        return ptsInside;
+	}
+
+    // DEBUG TIMES -> no reorders
+    template<typename Kernel>
+    [[nodiscard]] std::vector<size_t> neighborsPruneNoneTimesDebug(const Kernel& k) const {
+        std::vector<size_t> ptsInside;
+        const double searchRadius = k.radii().getX();
+        auto checkBoxIntersect = [&](uint32_t nodeIndex, uint32_t currDepth) {
+            auto nodeCenter = this->centers[nodeIndex];
+            auto nodeRadii = this->precomputedRadii[currDepth];
+            switch (k.boxIntersect(nodeCenter, nodeRadii)) {
+                case KernelAbstract::IntersectionJudgement::INSIDE: {
+                    // Completely inside, all add points and prune
+                    size_t startIndex = this->internalRanges[nodeIndex].first;
+                    size_t endIndex = this->internalRanges[nodeIndex].second;
+                    for (size_t i = startIndex; i < endIndex; ++i) {
+                        ptsInside.push_back(i);
+                    }
+                    return false;
+                }
+                case KernelAbstract::IntersectionJudgement::OVERLAP:
+                    // Overlaps but not inside, keep descending
+                    return true;
+                default:
+                    // Completely outside, prune
+                    return false;
+            }
+        };
+        resetFindAndInsertPointsAccumulators();
+        auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t dummy) {
             // Reached a leaf, add all points inside the kernel
             size_t startIndex = this->internalRanges[nodeIndex].first;
             size_t endIndex = this->internalRanges[nodeIndex].second;
-            TimeWatcher getRangeWatcher;
             TimeWatcher loopWatcher;
-            const size_t sizeBefore = ptsInside.size();
-            
-            // If getRange provided -> uses polar coords optimization
-            // Only checks points inside range returned by bestRange (from octree_range_selector)
-            if (getRange && sortedFlat && (endIndex - startIndex) > mainOptions.umbralPoda) {
-                const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-                if (leafIndex >= 0) {
-                    assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighborsPrune");
-                    if (mainOptions.debugLeavesTime) {
-                        getRangeWatcher.start();
-                    }
-                    const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, (endIndex - startIndex), precomputedRadii[currDepth]);
-                    if (mainOptions.debugLeavesTime) {
-                        getRangeWatcher.stop();
-                        accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
-                    }
-                    // Continue with the loop only if there was pruning, otherwise continue with the original loop
-                    if (range.count() < (endIndex - startIndex)) {
-
-                        //Loop with pruned range
-                        if (mainOptions.debugLeavesTime) {
-                            loopWatcher.start();
-                        }
-                        const Point* leafPoints = sortedFlat->leafData(leafIndex, (endIndex - startIndex), static_cast<int>(range.order));
-                        for (size_t i = range.iMin; i < range.iMax; ++i) {
-                            const Point& p = leafPoints[i]; 
-                            if (k.isInside(p)) {
-                                ptsInside.push_back(p.id());
-                            }
-                        }
-                        if (range.hasSecond) {
-                            for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                                const Point& p = leafPoints[i];
-                                if (k.isInside(p)) {
-                                    ptsInside.push_back(p.id());
-                                }
-                            }
-                        }
-                        if (mainOptions.debugLeavesTime) {
-                            loopWatcher.stop();
-                            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                        }
-                        if(mainOptions.debugRanges) {
-                            size_t neighborsFound = ptsInside.size() - sizeBefore;
-                            writeDetailedLeafRangeLog(leafIndex, getKernelName(k), range, mode, searchRadius, endIndex - startIndex, neighborsFound);
-                        }   
-                        return;
-                    }
-                }
-            }
-            if (mainOptions.debugLeavesTime) {
-                loopWatcher.start();
-            }
+            loopWatcher.start();
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(points[i])) {
                     ptsInside.push_back(i);
                 }
             }
-            if (mainOptions.debugLeavesTime) {
-                loopWatcher.stop();
-                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-            }
+            loopWatcher.stop();
+            accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
+            return;
         };
+        
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
-        writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
+        writeFindAndInsertPointsLog(getKernelName(k), searchRadius, ReorderMode::None);
         return ptsInside;
 	}
 
@@ -1509,16 +2043,97 @@ public:
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::square>
-    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None, const SortedDataFlat* sortedFlat = nullptr) const {
+    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radius);
-        return neighborsPrune(kernel, getRange, mode, sortedFlat);
+        return neighborsPrune(kernel);
 	}
 
 	template<Kernel_t kernel_type = Kernel_t::cube>
-    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None, const SortedDataFlat* sortedFlat = nullptr) const {
+    [[nodiscard]] inline std::vector<size_t> neighborsPrune(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
 		const auto kernel = kernelFactory<kernel_type>(p, radii);
-        return neighborsPrune(kernel, getRange, mode, sortedFlat);
+        return neighborsPrune(kernel);
 	}
+
+    template<Kernel_t kernel_type = Kernel_t::square>
+    [[nodiscard]] inline std::vector<size_t> neighborsPrunePolar(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radius);
+        return neighborsPrunePolar(kernel, getRange, mode);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::cube>
+    [[nodiscard]] inline std::vector<size_t> neighborsPrunePolar(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radii);
+        return neighborsPrunePolar(kernel, getRange, mode);
+	}
+    template<Kernel_t kernel_type = Kernel_t::square>
+    [[nodiscard]] inline std::vector<size_t> neighborsPruneCartesian(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radius);
+        return neighborsPruneCartesian(kernel, getRange, mode);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::cube>
+    [[nodiscard]] inline std::vector<size_t> neighborsPruneCartesian(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radii);
+        return neighborsPruneCartesian(kernel, getRange, mode);
+	}
+
+    template<Kernel_t kernel_type = Kernel_t::square>
+    [[nodiscard]] inline std::vector<size_t> neighborsPrunePolarRangesDebug(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radius);
+        return neighborsPrunePolarRangesDebug(kernel, getRange, mode);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::cube>
+    [[nodiscard]] inline std::vector<size_t> neighborsPrunePolarRangesDebug(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radii);
+        return neighborsPrunePolarRangesDebug(kernel, getRange, mode);
+	}
+    template<Kernel_t kernel_type = Kernel_t::square>
+    [[nodiscard]] inline std::vector<size_t> neighborsPruneCartesianRangesDebug(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radius);
+        return neighborsPruneCartesianRangesDebug(kernel, getRange, mode);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::cube>
+    [[nodiscard]] inline std::vector<size_t> neighborsPruneCartesianRangesDebug(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radii);
+        return neighborsPruneCartesianRangesDebug(kernel, getRange, mode);
+	}
+
+    template<Kernel_t kernel_type = Kernel_t::square>
+    [[nodiscard]] inline std::vector<size_t> neighborsPrunePolarTimesDebug(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radius);
+        return neighborsPrunePolarTimesDebug(kernel, getRange, mode);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::cube>
+    [[nodiscard]] inline std::vector<size_t> neighborsPrunePolarTimesDebug(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radii);
+        return neighborsPrunePolarTimesDebug(kernel, getRange, mode);
+	}
+    template<Kernel_t kernel_type = Kernel_t::square>
+    [[nodiscard]] inline std::vector<size_t> neighborsPruneCartesianTimesDebug(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radius);
+        return neighborsPruneCartesianTimesDebug(kernel, getRange, mode);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::cube>
+    [[nodiscard]] inline std::vector<size_t> neighborsPruneCartesianTimesDebug(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radii);
+        return neighborsPruneCartesianTimesDebug(kernel, getRange, mode);
+	}
+	template<Kernel_t kernel_type = Kernel_t::square>
+    [[nodiscard]] inline std::vector<size_t> neighborsPruneNoneTimesDebug(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radius);
+        return neighborsPruneNoneTimesDebug(kernel);
+	}
+
+	template<Kernel_t kernel_type = Kernel_t::cube>
+    [[nodiscard]] inline std::vector<size_t> neighborsPruneNoneTimesDebug(const Point& p, const Vector& radii, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
+		const auto kernel = kernelFactory<kernel_type>(p, radii);
+        return neighborsPruneNoneTimesDebug(kernel);
+	}
+
 
     template<Kernel_t kernel_type = Kernel_t::square>
     [[nodiscard]] inline std::vector<size_t> neighbors(const Point& p, double radius, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {

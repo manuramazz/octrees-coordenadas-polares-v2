@@ -35,7 +35,7 @@ public:
     // Función de construcción de array plano reordenado (duplicación)
     // ============================================================
     SortedDataFlat sortedFlat;
-
+    
     void buildSortedDataFlat(
         Octree_t& octree,
         Container& points,
@@ -46,85 +46,95 @@ public:
             return;
 
         const size_t numLeaves = octree.getNumLeaves();
-        sortedFlat.isPolar = (mode == ReorderMode::Polar);
-        // Paso 1 — calcular offsets (necesita saber el count de cada hoja)
-        sortedFlat.leafOffsets.resize(numLeaves + 1);
-        sortedFlat.leafOffsets[0] = 0;
+        const size_t totalPoints = points.size();
 
-        for (size_t leaf = 0; leaf < numLeaves; ++leaf) {
-            size_t count = leafPerms[leaf].perms[0].size();
-            if(count <= mainOptions.umbralPoda) count = 0;
-            sortedFlat.leafOffsets[leaf + 1] = sortedFlat.leafOffsets[leaf] + count;
+        // Evaluamos la característica estructural de la clase una sola vez en tiempo de compilación
+        constexpr bool useLeafPoints = requires(Octree_t& o, size_t l) { o.getLeafPoints(l); };
+
+        // Inicializamos y reservamos memoria exacta 1:1 con el vector points original
+        if (mode == ReorderMode::Polar) {
+            sortedFlat.PointsPolar.resize(totalPoints);
+        } else if (mode == ReorderMode::Cartesian) {
+            sortedFlat.PointsX.resize(totalPoints);
+            sortedFlat.PointsY.resize(totalPoints);
+            sortedFlat.PointsZ.resize(totalPoints);
         }
 
-        const size_t totalPoints = sortedFlat.leafOffsets[numLeaves];
-        sortedFlat.allData.resize(
-            mode == ReorderMode::Cartesian ? totalPoints * 3 : totalPoints
-        );
-
-        // Paso 2 — rellenar en paralelo (cada hoja escribe en su propio rango, sin solapamiento)
+        // Rellenar en paralelo: Cada hoja procesa su propio rango global indexado
         #pragma omp parallel for schedule(dynamic)
         for (size_t leaf = 0; leaf < numLeaves; ++leaf)
         {
-            const size_t offset     = sortedFlat.leafOffsets[leaf];
-            const size_t nextOffset = sortedFlat.leafOffsets[leaf + 1];
-            if (offset == nextOffset) continue;
-            const size_t count = nextOffset - offset;
-
+            size_t count = 0;
             size_t begin = 0;
             std::vector<size_t> leafPointsLocal;
 
-            if constexpr (requires { octree.getLeafPoints(leaf); }) {
+            // Recuperamos la información de direccionamiento de la hoja del Octree
+            if constexpr (useLeafPoints) {
                 leafPointsLocal = octree.getLeafPoints(leaf);
+                count = leafPointsLocal.size();
             } else {
                 auto [b, e] = octree.getLeafRange(leaf);
                 begin = b;
+                count = e - b;
             }
 
-            if (mode == ReorderMode::Cartesian) {
-                // 3 órdenes: X, Y, Z — cada uno ocupa su propio bloque en allData
-                // Layout: [bloque_X | bloque_Y | bloque_Z] para cada hoja
-                // Los offsets apuntan al inicio del bloque X; Y y Z están desplazados
-                // Para simplificar, aquí llenamos los 3 bloques contiguos:
-                // allData[offset*3 + 0..count)   = ordenado por X
-                // allData[offset*3 + count..2*count) = ordenado por Y
-                // allData[offset*3 + 2*count..3*count) = ordenado por Z
+            if (count == 0) continue;
 
-                for (int axis = 0; axis < 3; ++axis) {
-                    const auto& perm = leafPerms[leaf].perms[axis];
-                    const size_t blockOffset = offset * 3 + axis * count;
-
+            // CASO A: La hoja supera el umbral y tiene permutaciones de reordenamiento
+            if (count > mainOptions.umbralPoda) 
+            {
+                if (mode == ReorderMode::Cartesian) {
                     for (size_t i = 0; i < count; ++i) {
-                        size_t globalIdx;
-                        if constexpr (requires { octree.getLeafPoints(leaf); }) {
-                            globalIdx = leafPointsLocal[perm[i]];
-                        } else {
-                            globalIdx = begin + perm[i];
-                        }
-                        const auto& p = points[globalIdx];
-                        sortedFlat.allData[blockOffset + i] = Point(globalIdx, p.getX(), p.getY(), p.getZ());
-   
-                        
+                        // Sintaxis corregida: usamos la constante booleana calculada previamente
+                        size_t globalIdx = useLeafPoints ? leafPointsLocal[i] : (begin + i);
+
+                        // Para cada eje, buscamos qué punto va en esta posición 'i' secuencial de la hoja
+                        size_t idxX = useLeafPoints ? leafPointsLocal[leafPerms[leaf].perms[0][i]] : (begin + leafPerms[leaf].perms[0][i]);
+                        size_t idxY = useLeafPoints ? leafPointsLocal[leafPerms[leaf].perms[1][i]] : (begin + leafPerms[leaf].perms[1][i]);
+                        size_t idxZ = useLeafPoints ? leafPointsLocal[leafPerms[leaf].perms[2][i]] : (begin + leafPerms[leaf].perms[2][i]);
+
+                        const auto& pX = points[idxX];
+                        const auto& pY = points[idxY];
+                        const auto& pZ = points[idxZ];
+
+                        // Guardamos en la posición global correspondiente de cada layout
+                        sortedFlat.PointsX[globalIdx] = Point(idxX, pX.getX(), pX.getY(), pX.getZ());
+                        sortedFlat.PointsY[globalIdx] = Point(idxY, pY.getX(), pY.getY(), pY.getZ());
+                        sortedFlat.PointsZ[globalIdx] = Point(idxZ, pZ.getX(), pZ.getY(), pZ.getZ());
+                    }
+                } 
+                else { // Modo Polar
+                    for (size_t i = 0; i < count; ++i) {
+                        size_t globalIdx = useLeafPoints ? leafPointsLocal[i] : (begin + i);
+
+                        // Buscamos el punto según la permutación del ángulo azimutal
+                        size_t idxPolar = useLeafPoints ? leafPointsLocal[leafPerms[leaf].perms[0][i]] : (begin + leafPerms[leaf].perms[0][i]);
+
+                        const auto& p = points[idxPolar];
+                        sortedFlat.PointsPolar[globalIdx] = Point(p.getX(), p.getY(), p.getZ());
                     }
                 }
-
-            } else {
-                // Polar: un solo orden (K0)
-                const auto& perm = leafPerms[leaf].perms[0];
-
+            }
+            // CASO B: La hoja es pequeña (<= umbralPoda). Copia directa 1:1 para preservar consistencia
+            else 
+            {
                 for (size_t i = 0; i < count; ++i) {
-                    size_t globalIdx;
-                    if constexpr (requires { octree.getLeafPoints(leaf); }) {
-                        globalIdx = leafPointsLocal[perm[i]];
-                    } else {
-                        globalIdx = begin + perm[i];
-                    }
+                    size_t globalIdx = useLeafPoints ? leafPointsLocal[i] : (begin + i);
                     const auto& p = points[globalIdx];
-                    sortedFlat.allData[offset + i] = Point(globalIdx, p.getX(), p.getY(), p.getZ());
+
+                    if (mode == ReorderMode::Cartesian) {
+                        Point pt(globalIdx, p.getX(), p.getY(), p.getZ());
+                        sortedFlat.PointsX[globalIdx] = pt;
+                        sortedFlat.PointsY[globalIdx] = pt;
+                        sortedFlat.PointsZ[globalIdx] = pt;
+                    } else {
+                        sortedFlat.PointsPolar[globalIdx] = Point(p.getX(), p.getY(), p.getZ());
+                    }
                 }
             }
         }
-        std::cout << "Finished building sorted data flat" << " with mode " << localReorderTypeToString(mode) << std::endl;
+        std::cout << "Finished building sorted data flat 1:1 with " << totalPoints 
+                << " points. Mode: " << localReorderTypeToString(mode) << std::endl;
     }
 
     const SortedDataFlat& getSortedFlat() const {

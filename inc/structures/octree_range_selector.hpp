@@ -35,9 +35,6 @@ PrunedRange computeRange(
 {
     PrunedRange full{0, count, 0, 0, false, order};
 
-    if (count <= 1 || mode == ReorderMode::None)
-        return full;
-
     constexpr double eps = 1e-12;
     const auto& keys = reordered.getLeafKeys(leaf, order);
 

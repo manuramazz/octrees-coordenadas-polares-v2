@@ -9,28 +9,10 @@ enum class OrderType {
 
 
 struct SortedDataFlat {
-    bool isPolar = false;
-    std::vector<Point> allData; 
-    std::vector<size_t> leafOffsets; // leafOffsets[leaf] = inicio en allData
-
-    /**
-     * Devuelve el puntero al inicio del bloque de puntos de una hoja para un eje dado.
-     */
-    [[nodiscard]] inline const Point* leafData(size_t leaf, size_t count, int axis) const {
-        const int mult = isPolar ? 1 : 3; 
-        return allData.data() + (leafOffsets[leaf] * mult) + (axis * count);
-    }
-
-    /**
-     * Permite acceder a un punto específico por referencia.
-     */
-    [[nodiscard]] inline const Point& getPoint(size_t leaf, size_t count, int axis, size_t localIdx) const {
-        return leafData(leaf, count, axis)[localIdx];
-    }
-
-    [[nodiscard]] inline size_t leafCount(size_t leaf) const {
-        return leafOffsets[leaf + 1] - leafOffsets[leaf];
-    }
+    std::vector<Point> PointsPolar;
+    std::vector<Point> PointsX;
+    std::vector<Point> PointsY;
+    std::vector<Point> PointsZ;
 };
 
 
