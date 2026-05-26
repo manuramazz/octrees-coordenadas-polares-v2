@@ -6,7 +6,7 @@ mkdir -p "$FOLDER"
 # datasets
 datasets_low_density=(
     "data/paris_lille/Lille_0.las"
-    #"data/dales_las/test/5080_54400.las"
+    "data/dales_las/5145_54340.las"
     "data/paris_lille/Paris_Luxembourg_6.las"
 )
 datasets_high_density=(

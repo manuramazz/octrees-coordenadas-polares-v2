@@ -11,6 +11,7 @@ import matplotlib.lines as mlines
 import matplotlib.ticker as mticker
 from pathlib import Path
 from itertools import product
+from matplotlib.colors import LightSource
 
 
 ##########################################################
@@ -640,3 +641,267 @@ def plot_threshold_heatmap_comparison(df, cloud, reorder_mode, radius):
     plt.tight_layout()
     
     return fig
+
+##########################################################
+######### GRAFICAS DE VIS. PODAS EN ESPACIOS 3D ##########
+##########################################################
+def plot_octree_pruning_polar(save: bool = False):
+    # Creamos una figura con 2 subgráficas en paralelo
+    fig = plt.figure(figsize=(18, 8))
+    
+    # 1. Configuración del Nodo del Octree (un cubo de ejemplo)
+    cube_bounds = [1.0, 3.0, 1.0, 3.0, 0.0, 2.0]
+    cx = (cube_bounds[0] + cube_bounds[1]) / 2
+    cy = (cube_bounds[2] + cube_bounds[3]) / 2
+    cz = (cube_bounds[4] + cube_bounds[5]) / 2
+    
+    # 2. Configuración del Kernel (Esfera de consulta)
+    q_x, q_y, q_z = 3.5, 3.5, 1.0  
+    r = 1.8                         
+    
+    # 3. Cálculo de los límites de Poda Angulares
+    dx = q_x - cx  
+    dy = q_y - cy
+    dxy = np.sqrt(dx**2 + dy**2)
+    rxyEff = r 
+    
+    phiQ = np.arctan2(dy, dx)
+    if phiQ < 0:
+        phiQ += 2 * np.pi
+        
+    deltaPhi = np.arcsin(np.clip(rxyEff / dxy, 0.0, 1.0))
+    kMinRaw = phiQ - deltaPhi
+    kMaxRaw = phiQ + deltaPhi
+
+    # 4. Generación de las mallas de los Hiperplanos con TRASLACIÓN
+    r_lines = np.linspace(0, 4.0, 10)
+    # Hacemos que Z cubra el rango del cubo y un poco más
+    z_lines = np.linspace(cube_bounds[4] - 0.5, cube_bounds[5] + 0.5, 10)
+    R, Z = np.meshgrid(r_lines, z_lines)
+    
+    # Hiperplano Mínimo trasladado al centro (cx, cy)
+    X_min = cx + R * np.cos(kMinRaw)
+    Y_min = cy + R * np.sin(kMinRaw)
+    
+    # Hiperplano Máximo trasladado al centro (cx, cy)
+    X_max = cx + R * np.cos(kMaxRaw)
+    Y_max = cy + R * np.sin(kMaxRaw)
+
+    # Datos para la superficie de la esfera
+    u, v = np.mgrid[0:2*np.pi:30j, 0:np.pi:20j]
+    xs = q_x + r * np.cos(u) * np.sin(v)
+    ys = q_y + r * np.sin(u) * np.sin(v)
+    zs = q_z + r * np.cos(v)
+
+    # =========================================================================
+    # SUBPLOT 1: VISTA EN PERSPECTIVA 3D
+    # =========================================================================
+    ax1 = fig.add_subplot(121, projection='3d')
+    
+    # Dibujar aristas del Octree
+    for x in cube_bounds[:2]:
+        for y in cube_bounds[2:4]:
+            ax1.plot([x, x], [y, y], cube_bounds[4:], color='black', lw=1.5)
+    for x in cube_bounds[:2]:
+        for z in cube_bounds[4:]:
+            ax1.plot([x, x], cube_bounds[2:4], [z, z], color='black', lw=1.5)
+    for y in cube_bounds[2:4]:
+        for z in cube_bounds[4:]:
+            ax1.plot(cube_bounds[:2], [y, y], [z, z], color='black', lw=1.5)
+            
+    ax1.scatter(cx, cy, cz, color='red', s=60, label='Centro del Nodo (Origen Polar)')
+    ax1.scatter(q_x, q_y, q_z, color='blue', s=50, label='Centro Kernel (Q)')
+    
+    # Superficies
+    ax1.plot_surface(xs, ys, zs, color='cyan', alpha=0.2, edgecolor='none')
+    ax1.plot_surface(X_min, Y_min, Z, color='salmon', alpha=0.4, edgecolor='red', lw=0.3)
+    ax1.plot_surface(X_max, Y_max, Z, color='salmon', alpha=0.4, edgecolor='red', lw=0.3)
+
+    # Líneas guía (Saliendo desde el centro cx, cy, cz)
+    ax1.plot([cx, cx + 4.0*np.cos(kMinRaw)], [cy, cy + 4.0*np.sin(kMinRaw)], [cz, cz], color='red', linestyle='--', lw=2, label='Límites de Poda (Φ)')
+    ax1.plot([cx, cx + 4.0*np.cos(kMaxRaw)], [cy, cy + 4.0*np.sin(kMaxRaw)], [cz, cz], color='red', linestyle='--')
+    ax1.plot([cx, q_x], [cy, q_y], [cz, q_z], color='blue', linestyle=':', lw=2, label='Eje Central Φ_Q')
+
+    ax1.set_xlabel('Eje X')
+    ax1.set_ylabel('Eje Y')
+    ax1.set_zlabel('Eje Z')
+    ax1.set_title('Vista Perspectiva 3D', fontsize=12)
+    ax1.set_xlim(0.0, 6.0)
+    ax1.set_ylim(0.0, 6.0)
+    ax1.set_zlim(-0.5, 3.0)
+    ax1.view_init(elev=25, azim=-55)
+    ax1.legend(loc='upper left')
+
+    # =========================================================================
+    # SUBPLOT 2: VISTA CENITAL (DESDE ARRIBA)
+    # =========================================================================
+    ax2 = fig.add_subplot(122, projection='3d')
+    
+    # Replicamos el dibujo exacto en el segundo eje
+    for x in cube_bounds[:2]:
+        for y in cube_bounds[2:4]:
+            ax2.plot([x, x], [y, y], cube_bounds[4:], color='black', lw=1.5)
+    for x in cube_bounds[:2]:
+        for z in cube_bounds[4:]:
+            ax2.plot([x, x], cube_bounds[2:4], [z, z], color='black', lw=1.5)
+    for y in cube_bounds[2:4]:
+        for z in cube_bounds[4:]:
+            ax2.plot(cube_bounds[:2], [y, y], [z, z], color='black', lw=1.5)
+            
+    ax2.scatter(cx, cy, cz, color='red', s=60)
+    ax2.scatter(q_x, q_y, q_z, color='blue', s=50)
+    ax2.plot_surface(xs, ys, zs, color='cyan', alpha=0.2, edgecolor='none')
+    ax2.plot_surface(X_min, Y_min, Z, color='salmon', alpha=0.4, edgecolor='red', lw=0.3)
+    ax2.plot_surface(X_max, Y_max, Z, color='salmon', alpha=0.4, edgecolor='red', lw=0.3)
+
+    ax2.plot([cx, cx + 4.0*np.cos(kMinRaw)], [cy, cy + 4.0*np.sin(kMinRaw)], [cz, cz], color='red', linestyle='--', lw=2)
+    ax2.plot([cx, cx + 4.0*np.cos(kMaxRaw)], [cy, cy + 4.0*np.sin(kMaxRaw)], [cz, cz], color='red', linestyle='--')
+    ax2.plot([cx, q_x], [cy, q_y], [cz, q_z], color='blue', linestyle=':', lw=2)
+
+    ax2.set_xlabel('Eje X')
+    ax2.set_ylabel('Eje Y')
+    ax2.set_zlabel('')  # Ocultamos la etiqueta Z en la vista cenital
+    ax2.set_title('Vista Cenital (Plano XY)', fontsize=12)
+    ax2.set_xlim(0.0, 6.0)
+    ax2.set_ylim(0.0, 6.0)
+    ax2.set_zlim(-0.5, 3.0)
+    
+    # CONFIGURACIÓN CRUCIAL: Elevación a 90 grados y azimut a -90 hace que miremos desde arriba perfectamente alineados
+    ax2.view_init(elev=90, azim=-90)
+    # Ocultamos los ticks y valores de Z para que parezca un plano 2D limpio
+    ax2.set_zticklabels([])
+
+    # =========================================================================
+    # SALIDA
+    # =========================================================================
+    plt.suptitle('Poda Angular desde el centro de la hoja mediante el ángulo azimutal', fontsize=14, weight='bold', y=0.95)
+    plt.subplots_adjust()
+
+    if save:
+        # Corregido: Usamos ruta relativa sin la barra inclinada inicial para evitar problemas de permisos de root
+        output_dir = './images'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        output_path = os.path.join(output_dir, 'poda_octree_polar.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Gráfica doble guardada exitosamente en: {output_path}")
+    else:
+        plt.show()
+
+def plot_octree_pruning_cartesian_x(save: bool = False):
+    fig = plt.figure(figsize=(18, 8))
+    
+    # 1. Configuración del Nodo del Octree (El mismo cubo de antes)
+    # Límites del cubo [xmin, xmax, ymin, ymax, zmin, zmax]
+    cube_bounds = [1.0, 3.0, 1.0, 3.0, 0.0, 2.0]
+    cx = (cube_bounds[0] + cube_bounds[1]) / 2
+    cy = (cube_bounds[2] + cube_bounds[3]) / 2
+    cz = (cube_bounds[4] + cube_bounds[5]) / 2
+    
+    node_xmin, node_xmax = cube_bounds[0], cube_bounds[1]
+    node_ymin, node_ymax = cube_bounds[2], cube_bounds[3]
+    node_zmin, node_zmax = cube_bounds[4], cube_bounds[5]
+
+    # 2. Configuración del Kernel CÚBICO (AABB de consulta)
+    # Lo posicionamos desplazado a la derecha en X para que corte el plano máximo del nodo
+    kernel_size = 1.6
+    kernel_cx, kernel_cy, kernel_cz = 3.4, 2.3, 1.0  # Centro del kernel
+    
+    k_xmin = kernel_cx - kernel_size / 2
+    k_xmax = kernel_cx + kernel_size / 2
+    k_ymin = kernel_cy - kernel_size / 2
+    k_ymax = kernel_cy + kernel_size / 2
+    k_zmin = kernel_cz - kernel_size / 2
+    k_zmax = kernel_cz + kernel_size / 2
+    
+    kernel_bounds = [k_xmin, k_xmax, k_ymin, k_ymax, k_zmin, k_zmax]
+
+    # 3. Lógica de Poda en el Eje X (Simulando tu código C++)
+    # Evaluamos si los límites del kernel caen dentro del dominio [node_xmin, node_xmax]
+    planes_x = []
+    plane_labels = []
+    
+    if node_xmin <= k_xmin <= node_xmax:
+        planes_x.append(k_xmin)
+        plane_labels.append(f'Hiperplano Poda: X_min de Kernel ({k_xmin:.2f})')
+        
+    if node_xmin <= k_xmax <= node_xmax:
+        planes_x.append(k_xmax)
+        plane_labels.append(f'Hiperplano Poda: X_max de Kernel ({k_xmax:.2f})')
+
+    # Generación de la malla para el hiperplano cartesiano (paralelo al plano YZ)
+    # El plano se extenderá un poco más allá de los límites del nodo para que sea visible
+    y_lines = np.linspace(node_ymin - 0.5, node_ymax + 0.5, 10)
+    z_lines = np.linspace(node_zmin - 0.5, node_zmax + 0.5, 10)
+    Y_plane, Z_plane = np.meshgrid(y_lines, z_lines)
+
+    # Bucle para renderizar ambos subplots (1: Perspectiva, 2: Cenital)
+    for subplot_idx, title in [(121, 'Vista Perspectiva 3D (Poda Eje X)'), (122, 'Vista Cenital (Plano XY)')]:
+        ax = fig.add_subplot(subplot_idx, projection='3d')
+        
+        # --- DIBUJAR NODO (OCTREE) ---
+        for x in cube_bounds[:2]:
+            for y in cube_bounds[2:4]:
+                ax.plot([x, x], [y, y], cube_bounds[4:], color='black', lw=1.5)
+        for x in cube_bounds[:2]:
+            for z in cube_bounds[4:]:
+                ax.plot([x, x], cube_bounds[2:4], [z, z], color='black', lw=1.5)
+        for y in cube_bounds[2:4]:
+            for z in cube_bounds[4:]:
+                ax.plot(cube_bounds[:2], [y, y], [z, z], color='black', lw=1.5)
+                
+        ax.scatter(cx, cy, cz, color='red', s=60, label='Centro del Nodo' if subplot_idx == 121 else "")
+
+        # --- DIBUJAR KERNEL CÚBICO ---
+        for x in kernel_bounds[:2]:
+            for y in kernel_bounds[2:4]:
+                ax.plot([x, x], [y, y], kernel_bounds[4:], color='blue', lw=1.2, alpha=0.8)
+        for x in kernel_bounds[:2]:
+            for z in kernel_bounds[4:]:
+                ax.plot([x, x], kernel_bounds[2:4], [z, z], color='blue', lw=1.2, alpha=0.8)
+        for y in kernel_bounds[2:4]:
+            for z in kernel_bounds[4:]:
+                ax.plot(kernel_bounds[:2], [y, y], [z, z], color='blue', lw=1.2, alpha=0.8, label='Kernel Cúbico (AABB)' if (subplot_idx == 121 and x == kernel_bounds[0] and y == kernel_bounds[2]) else "")
+                
+        ax.scatter(kernel_cx, kernel_cy, kernel_cz, color='blue', s=40)
+
+        # --- DIBUJAR HIPERPLANOS DE PODA SI EXISTEN ---
+        for px, label in zip(planes_x, plane_labels):
+            X_plane = np.full_like(Y_plane, px)
+            ax.plot_surface(X_plane, Y_plane, Z_plane, color='salmon', alpha=0.5, edgecolor='red', lw=0.5, 
+                            label=label if subplot_idx == 121 else "")
+            
+            # Línea de trazo en la base para enfatizar el corte en X
+            ax.plot([px, px], [node_ymin - 0.5, node_ymax + 0.5], [cz, cz], color='red', linestyle='--', lw=2)
+
+        # Estética de los ejes
+        ax.set_xlabel('Eje X (Dimensión de Poda)')
+        ax.set_ylabel('Eje Y')
+        if subplot_idx == 121:
+            ax.set_zlabel('Eje Z')
+            ax.view_init(elev=25, azim=-55)
+            ax.legend(loc='upper left')
+        else:
+            ax.set_zlabel('')
+            ax.set_zticklabels([])
+            ax.view_init(elev=90, azim=-90) # Orientación de cámara cenital
+
+        ax.set_title(title, fontsize=12)
+        ax.set_xlim(0.0, 6.0)
+        ax.set_ylim(0.0, 6.0)
+        ax.set_zlim(-0.5, 3.0)
+
+    plt.suptitle('Poda Cartesiana mediante el Eje X', fontsize=14, weight='bold', y=0.95)
+    plt.subplots_adjust()
+
+    if save:
+        output_dir = './images'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        output_path = os.path.join(output_dir, 'poda_octree_cartesiana_x.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Gráfica cartesiana guardada exitosamente en: {output_path}")
+    else:
+        plt.show()
