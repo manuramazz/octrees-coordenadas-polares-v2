@@ -521,7 +521,7 @@ def analyze_speedup_and_timing(csv_path: str, save: bool = False, filename: str 
                         bottom=df_m['get_range_time'], label=f'{mode} (Loop)', alpha=0.9)
             
             multiplier += 1
-        ax.set_ylabel('Tiempo Medio (Nanosegundos)')
+        ax.set_ylabel('Tiempo Medio (Segundos)')
         ax.set_title(f'Desglose de Tiempo: Selector vs Loop\nKernel: {kern.upper()} | Dataset: {filename} | Config: {", ".join(configs)}')
         ax.set_xticks(np.arange(len(radii)) + width, [f'r={r}' for r in radii])
         ax.legend(loc='upper left', bbox_to_anchor=(1, 1))

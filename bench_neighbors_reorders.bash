@@ -1,12 +1,12 @@
 # setup
-FOLDER="out/resultsv3"
+FOLDER="resultsv6"
 set -e
 mkdir -p "$FOLDER"
 
 # datasets
 datasets_low_density=(
     "data/paris_lille/Lille_0.las"
-    #"data/dales_las/test/5080_54400.las"
+    "data/dales_las/5145_54340.las"
     "data/paris_lille/Paris_Luxembourg_6.las"
 )
 datasets_high_density=(
@@ -15,10 +15,10 @@ datasets_high_density=(
     #"data/speulderbos/Speulderbos_2017_TLS.las"
 )
 
-MAX_POINTS_LEAF=(128, 256, 512)
-UMBRALES_PODA=(8, 16, 32)
-N_SEARCHES="50000"
-FULL_OURS="neighbors,neighborsPrune,neighborsPtr"
+MAX_POINTS_LEAF=(256, 512, 1024)
+UMBRALES_PODA=(32, 64, 128)
+N_SEARCHES="10000"
+FULL_OURS="neighborsPrune"
 FULL_ALGOS_RADIUS="neighborsPrune"
 THREADS="1,2,4,8,16,24,32,40"
 LOCAL_REORDERS="none,polar,cartesian"
