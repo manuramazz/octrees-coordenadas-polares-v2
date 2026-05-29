@@ -1,5 +1,5 @@
 # setup
-FOLDER="outv6-leaves"
+FOLDER="outv7-leaves"
 set -e
 mkdir -p "$FOLDER"
 
@@ -12,7 +12,7 @@ datasets_low_density=(
 datasets_high_density=(
     "data/semantic3d/bildstein_station1_xyz_intensity_rgb.las" 
     "data/semantic3d/sg27_station8_intensity_rgb.las"
-    "data/pnoa/PNOA_2024_PNR_489-4672_NPC01.las"
+    # "data/pnoa/PNOA_2024_PNR_489-4672_NPC01.las"
     #"data/speulderbos/Speulderbos_2017_TLS.las"
 )
 MAX_POINTS_LEAF=(128, 256, 512)

@@ -18,7 +18,7 @@ from matplotlib.colors import LightSource
 ################ GRAFICAS DE DEBUG RANGES ################
 ##########################################################
 import matplotlib.ticker as mticker
-
+#
 def plot_pruning_points(csv_path: str, save: bool = False) -> None:
     df = pd.read_csv(csv_path)
     dataset_name = Path(csv_path).stem
@@ -36,22 +36,40 @@ def plot_pruning_points(csv_path: str, save: bool = False) -> None:
     df['config'] = df.apply(config_label, axis=1)
     configs = df['config'].unique()
 
-    # Agregamos vecinos (neighbours) a la agrupación
-    best_all = df.loc[df.groupby(
-        ['leaf', 'kernel', 'mode', 'radius', 'config'])['count'].idxmin()
-    ].copy()
+    # --- CÁLCULO DE L MEDIA SEGURO (SOLO MODO NONE) ---
+    if 'L' in df.columns and 'mode' in df.columns:
+        df_base_leaves = df[df['mode'] == 'none']
+        if df_base_leaves.empty:
+            df_base_leaves = df
+            
+        leaf_mapping = (
+            df_base_leaves.groupby(['kernel', 'radius'])['L']
+            .mean()
+            .reset_index()
+            .rename(columns={'L': 'L_clean'})
+        )
+    else:
+        leaf_mapping = None
 
+    # --- AGREGACIÓN DIRECTA Y LIMPIA ---
+    # Sumamos directamente todas las pasadas del dataset para evitar que idxmin descarte filas clave
     agg = (
-        best_all.groupby(['mode', 'kernel', 'radius', 'config'])
+        df.groupby(['mode', 'kernel', 'radius', 'config'])
         .agg(
             total_pts=('total', 'sum'), 
             evaluated_pts=('count', 'sum'),
-            neighbor_pts=('neighbours', 'sum') # Nueva columna de vecinos reales
+            neighbor_pts=('neighbours', 'sum')
         )
         .reset_index()
     )
     
-    # Porcentajes solicitados
+    # Inyectamos de forma segura el radio de hoja medio calculado con el modo base
+    if leaf_mapping is not None:
+        agg = pd.merge(agg, leaf_mapping, on=['kernel', 'radius'], how='left')
+    else:
+        agg['L_clean'] = 1.0
+
+    # Porcentajes de eficiencia de poda
     agg['pct_evaluated'] = (agg['evaluated_pts'] / agg['total_pts']) * 100
     agg['pct_neighbors_total'] = (agg['neighbor_pts'] / agg['total_pts']) * 100
 
@@ -62,14 +80,12 @@ def plot_pruning_points(csv_path: str, save: bool = False) -> None:
     for mode in modes:
         for config in configs:
             df_mode = agg[(agg['mode'] == mode) & (agg['config'] == config)]
-            best    = best_all[(best_all['mode'] == mode) & (best_all['config'] == config)]
-
             if df_mode.empty: continue
 
             n_kernels = len(kernels)
             n_radii   = len(radii)
             
-            # Ajuste de anchos para 3 barras (Total, Evaluated, Neighbors)
+            # Ajuste de proporciones para el bloque tricolor de barras
             group_width = 0.85
             bar_width   = group_width / (n_radii * 3.5) 
 
@@ -83,8 +99,7 @@ def plot_pruning_points(csv_path: str, save: bool = False) -> None:
             for ri, radius in enumerate(radii):
                 df_r = df_mode[df_mode['radius'] == radius].set_index('kernel')
 
-                # Centro del grupo para este radio dentro del kernel
-                # Desplazamiento para el trío de barras
+                # Centro de masa del subgrupo de radio para la alineación del texto inferior
                 base_offset = (ri - (n_radii - 1) / 2) * (bar_width * 3.8)
                 
                 offset_total = base_offset - bar_width
@@ -95,20 +110,32 @@ def plot_pruning_points(csv_path: str, save: bool = False) -> None:
                 evaluated = [df_r.loc[k, 'evaluated_pts'] if k in df_r.index else 0 for k in kernels]
                 neighbors = [df_r.loc[k, 'neighbor_pts']  if k in df_r.index else 0 for k in kernels]
                 
-                pct_eval  = [df_r.loc[k, 'pct_evaluated']      if k in df_r.index else 0 for k in kernels]
+                pct_eval  = [df_r.loc[k, 'pct_evaluated']       if k in df_r.index else 0 for k in kernels]
                 pct_neigh = [df_r.loc[k, 'pct_neighbors_total'] if k in df_r.index else 0 for k in kernels]
 
-                # Dibujo de barras
-                ax.bar(x + offset_total, totals, bar_width, label=f'r={radius} Total',
+                # Renderizado de barras
+                ax.bar(x + offset_total, totals, bar_width, label=f'r={radius} Total' if ri==0 else "",
                        color=colors_total[ri], edgecolor='black', linewidth=0.3)
                 
-                bars_ev = ax.bar(x + offset_eval, evaluated, bar_width, label=f'r={radius} Evaluados',
+                bars_ev = ax.bar(x + offset_eval, evaluated, bar_width, label=f'r={radius} Evaluados' if ri==0 else "",
                                  color=colors_eval[ri], edgecolor='black', linewidth=0.3)
                 
-                bars_ne = ax.bar(x + offset_neigh, neighbors, bar_width, label=f'r={radius} Vecinos',
+                bars_ne = ax.bar(x + offset_neigh, neighbors, bar_width, label=f'r={radius} Vecinos' if ri==0 else "",
                                  color=colors_neigh[ri], edgecolor='black', linewidth=0.3)
 
-                # Etiquetas de porcentaje arriba de barras
+                # --- TEXTO R/L INDEPENDIENTE Y SEGURO ---
+                for ki, k in enumerate(kernels):
+                    if k in df_r.index:
+                        L_val = df_r.loc[k, 'L_clean']
+                        ratio_rl = radius / L_val if L_val > 0 else radius
+                        
+                        pos_x = ki + base_offset
+                        
+                        ax.text(pos_x, -0.04, f'R/L\n{ratio_rl:.2f}', 
+                                transform=ax.get_xaxis_transform(),
+                                ha='center', va='top', fontsize=7.5, color='#555555')
+
+                # Etiquetas numéricas de rendimiento sobre las barras (Evita superposiciones)
                 for bi, bar in enumerate(bars_ev):
                     if pct_eval[bi] > 0:
                         ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
@@ -122,21 +149,24 @@ def plot_pruning_points(csv_path: str, save: bool = False) -> None:
                                 fontsize=7, color='darkgreen', rotation=90)
 
             ax.set_xticks(x)
-            ax.set_xticklabels([k.upper() for k in kernels], fontsize=11)
-            
-            ax.set_ylabel('Nº de Puntos (Escala Log)', fontsize=12)
+            ax.set_xticklabels([k.upper() for k in kernels], fontsize=11, fontweight='bold')
+            ax.tick_params(axis='x', pad=35) # Deja espacio suficiente para el bloque de texto R/L
+
+            ax.set_ylabel('Nº de Puntos', fontsize=12)
             ax.yaxis.set_major_formatter(mticker.FuncFormatter(
                 lambda val, _: f'{val/1e6:.1f}M' if val >= 1e6 else f'{val/1e3:.0f}K' if val >= 1e3 else f'{val:.0f}'))
             
             ax.set_title(f'Puntos: Total vs Evaluados (Poda) vs Vecinos Reales\n'
                          f'Dataset: {dataset_name} | Modo: {mode} | {config}', fontsize=12, fontweight='bold')
             
-            # Leyenda fuera para no tapar barras
-            ax.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=8, ncol=1)
+            # Quitar etiquetas repetidas de la leyenda
+            handles, labels = ax.get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            ax.legend(by_label.values(), by_label.keys(), loc='upper left', bbox_to_anchor=(1, 1), fontsize=8, ncol=1)
             ax.grid(axis='y', which='both', alpha=0.2)
             
             plt.tight_layout()
-            plt.show() # Muestra la gráfica
+            plt.show()
 
             if save:
                 safe_config = config.replace(' | ', '_').replace('=', '')
@@ -144,7 +174,7 @@ def plot_pruning_points(csv_path: str, save: bool = False) -> None:
                 fig.savefig(out_path, dpi=150, bbox_inches='tight')
                 print(f'Guardado: {out_path}')
             
-            plt.close(fig) # SOLUCIÓN: Cierra explícitamente para limpiar memoria
+            plt.close(fig)
 
 def plot_pruning_distribution(csv_path: str, save: bool = False) -> None:
     df = pd.read_csv(csv_path)
@@ -563,84 +593,256 @@ def analyze_speedup_and_timing(csv_path: str, save: bool = False, filename: str 
 ##########################################################
 #################### GRAFICAS FINALES ####################
 ##########################################################
-def plot_reorder_vs_base(df, cloud, algo, radius):
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib.ticker as ticker
+
+def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius="all"):
     """
-    Crea dos subplots (Cube vs Sphere) para comparar la reordenación 
-    frente a la base variando max_leaf.
+    Consolida todos los archivos en un único DataFrame y genera una figura independiente
+    para cada valor de radio, mostrando 'maxPointsLeaf' en el eje X con gráficos de barras.
+    Devuelve una lista de objetos Figure de Matplotlib.
     """
-    # Filtramos por nube, algoritmo y radio
-    subset = df[(df['octree'].str.contains(cloud)) & 
-                (df['operation'] == algo) & 
-                (df['radius'] == radius)].copy()
-    
-    # Etiquetamos experimentos
-    subset['experiment'] = subset['reorder'].apply(lambda x: "Base" if x == 'none' else f"Reordered ({x})")
-    
-    # Creamos la figura con 2 subplots
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-    kernels = ['Cube', 'Sphere']
-    
-    for i, kernel in enumerate(kernels):
-        ax = axes[i]
-        data_kernel = subset[subset['kernel'] == kernel]
+    # 1. Consolidar DataFrames
+    if allFiles:
+        dfs_list = get_dataset_files_in_dir(data_path, cloud)
+    else:
+        single_df = get_dataset_file(data_path, cloud)
+        dfs_list = [single_df] if single_df is not None else []
+
+    dfs_list = [d for d in dfs_list if d is not None and not d.empty]
+    if not dfs_list:
+        print(f"Advertencia: No se encontraron datos válidos para la nube {cloud}.")
+        return []
+
+    df_global = pd.concat(dfs_list, ignore_index=True)
+
+    # Filtros de Kernel y Radio
+    if kernel != "all":
+        if isinstance(kernel, str): kernel = [kernel]
+        df_global = df_global[df_global["kernel"].isin(kernel)]
         
-        if data_kernel.empty:
-            ax.set_title(f"No hay datos para {kernel}")
-            continue
+    if radius != "all":
+        if not isinstance(radius, list): radius = [radius]
+        df_global = df_global[df_global["radius"].isin(radius)]
+
+    if df_global.empty:
+        return []
+
+    # Dejamos los nombres originales de tus experimentos tal y como vienen mapeados en tu script
+    df_global['experiment'] = df_global['reorder'].apply(lambda x: "Base" if x == 'none' else f"Reordered ({x})")
+
+    # Mapeo TeX para la notación matemática formal de los Kernels
+    kernel_titles = {
+        'circle': r'$\mathcal{N}_{Circle}$',
+        'sphere': r'$\mathcal{N}_{Sphere}$',
+        'square': r'$\mathcal{N}_{Square}$',
+        'cube': r'$\mathcal{N}_{Cube}$'
+    }
+
+    unique_radii = sorted(df_global['radius'].unique())
+    unique_kernels = df_global['kernel'].unique()
+
+    figs = []  
+
+    # 2. Iterar por cada RADIO
+    for rad in unique_radii:
+        df_rad = df_global[df_global['radius'] == rad].copy()
+        if df_rad.empty: continue
+
+        n_kernels = len(unique_kernels)
+        
+        # Creamos los subplots compartiendo el eje Y
+        fig, axes = plt.subplots(1, n_kernels, figsize=(6.5 * n_kernels, 5), sharey=True, squeeze=False)
+        axes = axes.flatten()
+        
+        # Guardaremos los handles de las barras para crear la leyenda global
+        handles, labels = [], []
+        
+        for i, kern in enumerate(unique_kernels):
+            ax = axes[i]
+            data_kernel = df_rad[df_rad['kernel'] == kern]
             
-        sns.lineplot(data=data_kernel, x='max_leaf', y='mean', hue='experiment', 
-                     marker='o', linewidth=2.5, ax=ax)
-        
-        ax.set_title(f'Kernel: {kernel.upper()}', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Tiempo Medio (ns)')
-        ax.set_xlabel('Puntos máximos por hoja (max_leaf)')
-        ax.grid(True, which="both", ls="-", alpha=0.2)
-        ax.set_yscale('log')
-        
-    plt.suptitle(f'Impacto de la Reordenación por Kernel ({cloud}, r={radius})', fontsize=16, y=1.02)
-    plt.tight_layout()
-    
-    return fig
-
-def plot_threshold_heatmap_comparison(df, cloud, reorder_mode, radius):
-    """
-    Genera dos mapas de calor (Cube vs Sphere) para encontrar el 
-    umbral de poda (threshold) y max_leaf óptimos.
-    """
-    subset = df[(df['octree'].str.contains(cloud)) & 
-                (df['reorder'] == reorder_mode) & 
-                (df['radius'] == radius)]
-    
-    fig, axes = plt.subplots(1, 2, figsize=(18, 8), sharey=True)
-    kernels = ['Cube', 'Sphere']
-    
-    # Buscamos el valor mínimo global para que la escala de colores sea comparable
-    vmin = subset['mean'].min()
-    vmax = subset['mean'].max()
-
-    for i, kernel in enumerate(kernels):
-        ax = axes[i]
-        data_kernel = subset[subset['kernel'] == kernel]
-        
-        if data_kernel.empty:
-            continue
+            if data_kernel.empty:
+                ax.set_title(f"No hay datos para {kern}")
+                continue
+                
+            # Renderizado del gráfico de barras
+            bp = sns.barplot(
+                data=data_kernel, 
+                x='maxPointsLeaf', 
+                y='mean', 
+                hue='experiment', 
+                ax=ax,
+                edgecolor='#444444',
+                linewidth=0.8,
+                alpha=0.85
+            )
             
-        # Pivotar: Filas (Max Leaf), Columnas (Threshold)
-        pivot = data_kernel.pivot_table(index='max_leaf', columns='threshold', 
-                                        values='mean', aggfunc='mean')
-        
-        sns.heatmap(pivot, annot=True, fmt=".0f", cmap="YlGnBu_r", 
-                    ax=ax, vmin=vmin, vmax=vmax, cbar_kws={'label': 'Tiempo (ns)'})
-        
-        ax.set_title(f'Kernel: {kernel.upper()}', fontsize=14, fontweight='bold')
-        ax.set_xlabel('Umbral de Poda (threshold)')
-        ax.set_ylabel('Max Leaf (puntos/hoja)')
+            # Recuperamos los handles de la leyenda de este ax antes de eliminarla
+            if not handles and ax.get_legend_handles_labels()[0]:
+                handles, labels = ax.get_legend_handles_labels()
+            if ax.get_legend() is not None:
+                ax.get_legend().remove() 
+            
+            # --- MODIFICACIÓN: Título con Radio y Notación del Kernel ---
+            tex_kernel = kernel_titles.get(kern.lower(), f'{kern.upper()}')
+            ax.set_title(f'{tex_kernel}\n' r'$r = ' f'{rad}\ m$', fontsize=13, pad=10)
+            
+            # Estilización de ejes
+            ax.set_ylabel('Mean runtime (s)' if i == 0 else '', fontsize=12)
+            ax.set_xlabel('Puntos máximos por hoja (maxPointsLeaf)', fontsize=11)
+            ax.grid(True, which="both", ls=":", alpha=0.15, axis='y')
+            ax.set_yscale('log')
+            
+            # Formateador del eje Y logarítmico limpio
+            ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, subs=(1.0, 2.0, 5.0), numticks=20))
+            ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{y:g}'))
+            ax.tick_params(axis='both', which='major', labelsize=10)
 
-    plt.suptitle(f'Optimización de Hiperparámetros - Modo: {reorder_mode}\nDataset: {cloud} | Radio: {radius}', 
-                 fontsize=16, fontweight='bold', y=1.02)
-    plt.tight_layout()
-    
-    return fig
+        # --- LEYENDA ÚNICA GLOBAL SUPERIOR ---
+        if handles:
+            fig.legend(
+                handles, labels,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 0.98),  # Centrado en la parte superior de la figura
+                ncol=len(labels),             # Una sola fila con todas las opciones
+                frameon=True,
+                facecolor='white',
+                edgecolor='#CCCCCC',
+                fontsize=11,
+                handlelength=1.8,
+                handletextpad=0.5,
+                columnspacing=1.5
+            )
+        
+        # Ajuste de márgenes para dar espacio arriba a la leyenda y los títulos
+        plt.subplots_adjust(left=0.08, right=0.95, bottom=0.15, top=0.78, wspace=0.15)
+        
+        figs.append(fig)
+        
+    return figs
+
+def plot_threshold_heatmap_comparison(data_path, cloud, reorder_mode, allFiles=True, kernel="all", radius="all"):
+    """
+    Genera figuras independientes por cada valor de radio. Cada figura contiene subplots
+    en forma de mapas de calor para encontrar la combinación óptima de 'threshold' y 'maxPointsLeaf'.
+    Los títulos de cada gráfico muestran la notación matemática formal del kernel y el radio.
+    Devuelve una lista de objetos Figure de Matplotlib.
+    """
+    # 1. Consolidar DataFrames
+    if allFiles:
+        dfs_list = get_dataset_files_in_dir(data_path, cloud)
+    else:
+        single_df = get_dataset_file(data_path, cloud)
+        dfs_list = [single_df] if single_df is not None else []
+
+    dfs_list = [d for d in dfs_list if d is not None and not d.empty]
+    if not dfs_list:
+        print(f"Advertencia: No se encontraron datos válidos para la nube {cloud}.")
+        return []
+
+    df_global = pd.concat(dfs_list, ignore_index=True)
+    mask = (df_global['reorder'] == reorder_mode)
+    df_filtered = df_global[mask].copy()
+
+    if kernel != "all":
+        if isinstance(kernel, str): kernel = [kernel]
+        df_filtered = df_filtered[df_filtered["kernel"].isin(kernel)]
+        
+    if radius != "all":
+        if not isinstance(radius, list): radius = [radius]
+        df_filtered = df_filtered[df_filtered["radius"].isin(radius)]
+
+    if df_filtered.empty:
+        print(f"Advertencia: No hay datos que coincidan con los filtros aplicados para {cloud}.")
+        return []
+
+    # Mapeo TeX para la notación matemática formal de los Kernels
+    kernel_titles = {
+        'circle': r'$\mathcal{N}_{Circle}$',
+        'sphere': r'$\mathcal{N}_{Sphere}$',
+        'square': r'$\mathcal{N}_{Square}$',
+        'cube': r'$\mathcal{N}_{Cube}$'
+    }
+
+    # Extraer los radios y kernels únicos presentes tras los filtros
+    unique_radii = sorted(df_filtered['radius'].unique())
+    unique_kernels = df_filtered['kernel'].unique()
+
+    figs = []  # Array para acumular las figuras (una por cada radio)
+
+    # 2. Bucle exterior: Una figura diferente por cada valor de RADIO
+    for rad in unique_radii:
+        df_rad = df_filtered[df_filtered['radius'] == rad].copy()
+        if df_rad.empty: 
+            continue
+
+        n_kernels = len(unique_kernels)
+        
+        # Estructura de subplots en horizontal compartiendo el eje Y (maxPointsLeaf)
+        fig, axes = plt.subplots(1, n_kernels, figsize=(7.5 * n_kernels, 5.5), sharey=True, squeeze=False)
+        axes = axes.flatten()
+        
+        # Buscamos los límites mínimos y máximos específicos de este radio 
+        # para que la escala de color (colorbar) sea perfectamente comparable entre subplots
+        vmin = df_rad['mean'].min()
+        vmax = df_rad['mean'].max()
+        
+        for i, kern in enumerate(unique_kernels):
+            ax = axes[i]
+            data_kernel = df_rad[df_rad['kernel'] == kern]
+            
+            if data_kernel.empty:
+                ax.set_title(f"No hay datos para {kern}")
+                continue
+                
+            # Pivotar datos: Filas (maxPointsLeaf), Columnas (threshold), Celda (mean)
+            # Se usa 'maxPointsLeaf' en el index para mantener concordancia de nombres
+            pivot = data_kernel.pivot_table(index='maxPointsLeaf', columns='threshold', 
+                                            values='mean', aggfunc='mean')
+            
+            # Dibujar el mapa de calor
+            # Solo pintamos la barra de color (cbar) en el último mapa de la derecha para no saturar
+            show_cbar = (i == n_kernels - 1)
+            
+            sns.heatmap(
+                pivot, 
+                annot=True, 
+                fmt=".2f",          # Dos decimales para los tiempos medios (puedes poner .0f si son enteros)
+                cmap="coolwarm_r", 
+                ax=ax, 
+                vmin=vmin, 
+                vmax=vmax, 
+                cbar=show_cbar,
+                cbar_kws={'label': 'Tiempo Total (s)'} if show_cbar else None,
+                linewidths=0.5,
+                linecolor='#EEEEEE'
+            )
+            
+            # --- Título con Radio y Notación del Kernel ---
+            tex_kernel = kernel_titles.get(kern.lower(), f'{kern.upper()}')
+            ax.set_title(f'{tex_kernel}\n' r'$r = ' f'{rad}\ m$', fontsize=13, pad=10)
+            
+            # Configuración de los nombres de los ejes
+            ax.set_xlabel('Umbral de Poda (threshold)', fontsize=11)
+            ax.set_ylabel('Puntos máximos por hoja (maxPointsLeaf)' if i == 0 else '', fontsize=11)
+            
+            # Forzar a que las etiquetas del eje Y no se roten de forma extraña
+            ax.tick_params(axis='y', rotation=0)
+
+        # Ajuste preciso de los márgenes de la figura para evitar solapamientos
+        plt.subplots_adjust(left=0.10, right=0.92, bottom=0.15, top=0.82, wspace=0.18)
+        plt.suptitle(
+            f'Comparación de Configuraciones de Poda\n'
+            f'Dataset: {cloud} | Reorder: {reorder_mode}',
+            fontsize=16, fontweight='bold', y=1.02)
+        plt.show()
+        figs.append(fig)
+        
+    return figs
 
 ##########################################################
 ######### GRAFICAS DE VIS. PODAS EN ESPACIOS 3D ##########

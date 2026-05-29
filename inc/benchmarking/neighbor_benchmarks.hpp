@@ -435,10 +435,16 @@ class NeighborsBenchmark {
             typename LinearOctree<Container>::RangeFn getRange = nullptr;
             const std::string_view reorderModeStr = localReorderTypeToString(mode);
 
-            if (mode != ReorderMode::None) {
+            if (mode == ReorderMode::Polar) {
                 getRange = [&](uint32_t leafIndex, const Point& query, double radius, size_t count, const Vector& leafRadii) {
-                    PrunedRange range = bestRange(leafIndex, query, radius, kernel,
-                                                count, oct, reordered, mode, leafRadii, false);
+                    PrunedRange range = bestRangePolar(leafIndex, query, radius, kernel,
+                                                count, oct, reordered);
+                    return range;
+                };
+            }else if (mode == ReorderMode::Cartesian) {
+                getRange = [&](uint32_t leafIndex, const Point& query, double radius, size_t count, const Vector& leafRadii) {
+                    PrunedRange range = bestRangeCartesian(leafIndex, query, radius, kernel,
+                                                count, oct, reordered, leafRadii);
                     return range;
                 };
             }

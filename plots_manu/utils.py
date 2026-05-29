@@ -4,11 +4,12 @@ from typing import Dict, Tuple
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-# import scienceplots
+import scienceplots
 import matplotlib as mpl
 import glob
 from datetime import datetime
 import csv
+from pathlib import Path
 
 OUTPUT_DPI = 300
 
@@ -39,7 +40,7 @@ def set_default_style(font_size=14, axes_labelsize=14, xtick_labelsize=14,
         'figure.facecolor': 'white',
         'figure.edgecolor': 'white',
     })
-    mpl.rcParams['text.usetex'] = True
+    mpl.rcParams['text.usetex'] = False
 
 # reads a locality data file with name <DATASET_NAME>-<ENCODER>-locality.csv 
 def get_locality_file(data_path: str, cloud_name: str, encoder: str = "none") -> pd.DataFrame:
@@ -58,7 +59,9 @@ def get_all_locality_files(data_path: str, cloud_name: str, encoders: Tuple[str,
     return datasets
 
 def get_dataset_file(data_path, cloud_name, timestamp="latest"):
-    csv_folder = os.path.join(data_path, cloud_name)
+    base_dir = Path(data_path)
+    csv_folder = base_dir / cloud_name
+    print(f"Buscando archivos en: {csv_folder.resolve()}")
     csv_files = glob.glob(os.path.join(csv_folder, "*.csv"))
     df = None
     print(csv_folder)
@@ -73,7 +76,8 @@ def get_dataset_file(data_path, cloud_name, timestamp="latest"):
             try:
                 filename = os.path.basename(file)
                 ts_str = '-'.join(filename.split('-')[1:]).replace('.csv', '')
-                ts = datetime.strptime(ts_str, "%Y-%m-%d-%H:%M:%S")
+                clean_timestamp_string = ts_str.replace('\uf03a', ':')
+                ts = datetime.strptime(clean_timestamp_string, "%Y-%m-%d-%H:%M:%S")
                 if latest_time is None or ts > latest_time:
                     latest_time = ts
                     latest_file = file
@@ -92,7 +96,8 @@ def get_dataset_file(data_path, cloud_name, timestamp="latest"):
             try:
                 filename = os.path.basename(file)
                 ts_str = '-'.join(filename.split('-')[1:]).replace('.csv', '')
-                if timestamp == ts_str:
+                clean_timestamp_string = ts_str.replace('\uf03a', ':')
+                if timestamp == clean_timestamp_string:
                     print(f"Loading file: {file}")
                     df = pd.read_csv(file)
                     break
@@ -104,6 +109,26 @@ def get_dataset_file(data_path, cloud_name, timestamp="latest"):
             raise FileNotFoundError(f"File with date '{timestamp}' not found in folder: {csv_folder}")
 
     return df
+
+def get_dataset_files_in_dir(data_path, cloud_name, timestamp="latest"):
+    base_dir = Path(data_path)
+    csv_folder = base_dir / cloud_name
+    print(f"Buscando archivos en: {csv_folder.resolve()}")
+    csv_files = glob.glob(os.path.join(csv_folder, "*.csv"))
+    dfs = []
+    df = None
+    print(csv_folder)
+    if not csv_files:
+        raise FileNotFoundError(f"No CSV files found in the folder: {csv_folder}")
+
+    for file in csv_files:
+        print(f"Loading results file: {file}")
+        df = pd.read_csv(file)
+        dfs.append(df)
+
+    return dfs
+
+
 
 
 def read_multiple_datasets(data_path, clouds_datasets):

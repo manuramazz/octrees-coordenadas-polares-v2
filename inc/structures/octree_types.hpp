@@ -27,6 +27,11 @@ struct PrunedRange {
     [[nodiscard]] inline size_t count() const { return hasSecond ? (iMax - iMin) + (iMax2 - iMin2) : (iMax - iMin); }
 };
 
+struct RangeDebugTimers {
+    double projectionTimeSec = 0.0;
+    double binarySearchTimeSec = 0.0;
+};
+
 
 // Clase de utilidades matemáticas
 namespace detail {
@@ -36,11 +41,11 @@ namespace detail {
 
     inline double effectiveXYRadius(double radius, Kernel_t kernel) {
         if (kernel == Kernel_t::cube) {
-            return radius * std::sqrt(2.0);
+            return radius * 1.41421356237309;
         }if (kernel == Kernel_t::sphere) {
             return radius;
         }if (kernel == Kernel_t::square) {
-            return radius * std::sqrt(2.0);
+            return radius * 1.41421356237309;
         }if (kernel == Kernel_t::circle) {
             return radius;
         }
@@ -52,53 +57,12 @@ namespace detail {
         double dx, dy, dz;
         double dxy;
         double radius=0, rEff=0, rxyEff=0;
-
-        static LeafQueryGeometry computePolar(
-            const Point& query,
-            const Point& center,
-            double radius,
-            Kernel_t kernel)
-        {
-            LeafQueryGeometry g;
-            g.dx  = query.getX() - center.getX();
-            g.dy  = query.getY() - center.getY();
-            g.dz  = query.getZ() - center.getZ();
-            g.dxy = std::sqrt(g.dx * g.dx + g.dy * g.dy);
-            g.rxyEff = effectiveXYRadius(radius, kernel);
-            return g;
-        }
-        static LeafQueryGeometry computeCart(
-            const Point& query,
-            const Point& center,
-            double radius,
-            Kernel_t kernel)
-        {
-            LeafQueryGeometry g;
-            g.dx  = query.getX() - center.getX();
-            g.dy  = query.getY() - center.getY();
-            g.dz  = query.getZ() - center.getZ();
-            g.radius = radius;
-            return g;
-        }
     };
 
 
     inline double normalizeAngle0To2Pi(double a) {
         double out = std::fmod(a, kTwoPi);
         return out < 0.0 ? out + kTwoPi : out;
-    }
-
-    inline bool kernelContainsLeafPerAxis(const LeafQueryGeometry& geo, const Vector& leafRadii, OrderType order) {
-        const double eps = 1e-9;
-        if (order == OrderType::K0) {
-            return (geo.dx - geo.radius < - leafRadii.getX() - eps) && (geo.dx + geo.radius > leafRadii.getX() + eps);
-        } else if (order == OrderType::K1) {
-            return (geo.dy - geo.radius < - leafRadii.getY() - eps) && (geo.dy + geo.radius > leafRadii.getY() + eps);
-        } else {
-            return (geo.dz - geo.radius < - leafRadii.getZ() - eps) && (geo.dz + geo.radius > leafRadii.getZ() + eps);
-        }
-        return false;
-    
     }
 
 

@@ -46,6 +46,32 @@ namespace {
 * 
 */
 
+
+inline std::filesystem::path getFindAndInsertPointsLogPath() {
+    static std::optional<std::filesystem::path> rangeTimingLogPath;
+    if (!rangeTimingLogPath.has_value()) {
+        const std::filesystem::path logDir = mainOptions.outputDirName / "leaves-time";
+        std::filesystem::create_directories(logDir);
+        const std::string baseName = mainOptions.inputFileName.empty() ? std::string("octree") : mainOptions.inputFileName;
+        const auto now = std::chrono::system_clock::now();
+        const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+        std::tm tmSnapshot{};
+#ifdef _WIN32
+        localtime_s(&tmSnapshot, &nowTime);
+#else
+        localtime_r(&nowTime, &tmSnapshot);
+#endif
+
+        std::ostringstream stamp;
+        stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
+        rangeTimingLogPath = logDir / (baseName + "-" + stamp.str() + ".csv");
+    }
+    return *rangeTimingLogPath;
+}
+
+#include "octree_range_selector.hpp"
+
+
 template <PointContainer Container>
 class LinearOctree {
 
@@ -173,7 +199,6 @@ protected:
     /// @brief A vector containing the half-lengths of the minimum measure of the encoding.
     double halfLengths[3];
 
-    mutable std::optional<std::filesystem::path> rangeTimingLogPath;
     mutable bool rangeTimingLogHeaderWritten = false;
     mutable bool rangeDebugHeaderWritten = false;
 
@@ -937,27 +962,6 @@ public:
         return logFile;
     }
 
-    std::filesystem::path getFindAndInsertPointsLogPath() const {
-        if (!rangeTimingLogPath.has_value()) {
-            const std::filesystem::path logDir = mainOptions.outputDirName / "leaves-time";
-            std::filesystem::create_directories(logDir);
-            const std::string baseName = mainOptions.inputFileName.empty() ? std::string("octree") : mainOptions.inputFileName;
-            const auto now = std::chrono::system_clock::now();
-            const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-            std::tm tmSnapshot{};
-#ifdef _WIN32
-            localtime_s(&tmSnapshot, &nowTime);
-#else
-            localtime_r(&nowTime, &tmSnapshot);
-#endif
-
-            std::ostringstream stamp;
-            stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
-            rangeTimingLogPath = logDir / (baseName + "-" + stamp.str() + ".csv");
-        }
-        return *rangeTimingLogPath;
-    }
-
     inline void printRangeSelectorLog(const std::string& message) const {
         auto& f = getRangeSelectorLog();
         if(!rangeDebugHeaderWritten) {
@@ -1007,7 +1011,7 @@ public:
             rangeTimingLogHeaderWritten = true;
             std::error_code ec;
             if (!std::filesystem::exists(logPath, ec) || std::filesystem::file_size(logPath, ec) == 0) {
-                logFile << "kernel,radius,mode,get_range_time,loop_time,threshold,maxPointsLeaf\n";
+                logFile << "kernel,radius,mode,get_range_time,loop_time,projectionTime,binarySearchTime,threshold,maxPointsLeaf\n";
             }
         }
 
@@ -1016,8 +1020,11 @@ public:
                 << localReorderTypeToString(mode) << ","
                 << accumulatedGetRangeTime << ","
                 << accumulatedLoopTime << ","
+                << "0.0" << ","
+                << "0.0" << ","
                 << std::to_string(mainOptions.umbralPoda) << ","
                 << std::to_string(mainOptions.maxPointsLeaf) << "\n";
+
         hasLoggedThisSearch = true;
     }
 
@@ -1459,6 +1466,7 @@ public:
             }
         };
         resetFindAndInsertPointsAccumulators();       
+        resetRangeSelectorAccumulators();
         auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
             const size_t startIndex = this->internalRanges[nodeIndex].first;
             const size_t endIndex = this->internalRanges[nodeIndex].second;
@@ -1521,6 +1529,7 @@ public:
         };
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
         writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
+        writeRangeSelectorProfileLog(getKernelName(k), searchRadius, std::string(localReorderTypeToString(mode)));
         return ptsInside;
 	}
 
@@ -1558,6 +1567,7 @@ public:
             }
         };
         resetFindAndInsertPointsAccumulators();
+        resetRangeSelectorAccumulators();
         auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t currDepth) {
             const size_t startIndex = this->internalRanges[nodeIndex].first;
             const size_t endIndex = this->internalRanges[nodeIndex].second;
@@ -1619,6 +1629,7 @@ public:
         };
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
         writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
+        writeRangeSelectorProfileLog(getKernelName(k), searchRadius, std::string(localReorderTypeToString(mode)));
         return ptsInside;
 	}
 
