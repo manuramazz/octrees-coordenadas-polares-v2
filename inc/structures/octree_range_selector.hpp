@@ -74,8 +74,44 @@ inline void writeRangeSelectorProfileLog(const std::string& kernelName, double r
             << std::to_string(mainOptions.maxPointsLeaf) << "\n";
 }
 
+
+// =========================================================================
+// FUNCIONES DE BÚSQUEDA BINARIA SIN SALTOS (BRANCHLESS)
+// =========================================================================
+inline size_t branchless_lower_bound(const std::vector<double>& keys, double val) {
+    size_t base = 0;
+    size_t len = keys.size();
+    
+    while (len > 1) {
+        size_t half = len >> 1;
+        base += (keys[base + half - 1] < val) * half;
+        len -= half;
+    }
+    
+    if (!keys.empty() && keys[base] < val) {
+        base++;
+    }
+    return base;
+}
+
+inline size_t branchless_upper_bound(const std::vector<double>& keys, double val) {
+    size_t base = 0;
+    size_t len = keys.size();
+    
+    while (len > 1) {
+        size_t half = len >> 1;
+        base += (keys[base + half - 1] <= val) * half;
+        len -= half;
+    }
+    
+    if (!keys.empty() && keys[base] <= val) {
+        base++;
+    }
+    return base;
+}
+
 // ###########################################################################################
-// ########################## MODO CARTESIANO ULTRA-OPTIMIZADO ###############################
+// ########################## MODO CARTESIANO  ###############################
 // ###########################################################################################
 template<typename Octree_t, typename Reordered_t>
 inline PrunedRange bestRangeCartesian(
@@ -147,12 +183,14 @@ inline PrunedRange bestRangeCartesian(
 
         size_t iMin = 0;
         if (kMin > firstKey) {
-            iMin = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMin) - keys.begin());
+            // iMin = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMin) - keys.begin());
+            iMin = branchless_lower_bound (keys, kMin);
         }
 
         size_t iMax = count;
         if (kMax < lastKey) {
-            iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMax) - keys.begin());
+            // iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMax) - keys.begin());
+            iMax = branchless_upper_bound (keys, kMax);
         }
 
         if (mainOptions.debugLeavesTime) {
@@ -176,7 +214,7 @@ inline PrunedRange bestRangeCartesian(
 }
 
 // ###########################################################################################
-// ############################ MODO POLAR ULTRA-OPTIMIZADO ##################################
+// ############################ MODO POLAR ##################################
 // ###########################################################################################
 template<typename Octree_t, typename Reordered_t>
 inline PrunedRange bestRangePolar(
@@ -244,6 +282,12 @@ inline PrunedRange bestRangePolar(
     const double kMaxRaw = phiQ + deltaPhi;
 
     const auto binaryStart = std::chrono::steady_clock::now();
+    if (kMinRaw < 0.0 || kMaxRaw >= detail::kTwoPi) {
+        if (mainOptions.debugLeavesTime) {
+            accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
+        }
+        return full;
+    }
     const auto& keys = reordered.getLeafKeys(leaf, OrderType::K0);
     if (keys.empty()) {
         if (mainOptions.debugLeavesTime) {
@@ -252,26 +296,28 @@ inline PrunedRange bestRangePolar(
         return full;
     }
 
-    if (kMinRaw < 0.0) {
-        size_t iMax1 = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
-        size_t iMin2 = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw + detail::kTwoPi) - keys.begin());
-        if (mainOptions.debugLeavesTime) {
-            accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
-        }
-        return {0, iMax1, iMin2, count, true, OrderType::K0};
-    }
+    // if (kMinRaw < 0.0) {
+    //     size_t iMax1 = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
+    //     size_t iMin2 = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw + detail::kTwoPi) - keys.begin());
+    //     if (mainOptions.debugLeavesTime) {
+    //         accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
+    //     }
+    //     return {0, iMax1, iMin2, count, true, OrderType::K0};
+    // }
     
-    if (kMaxRaw >= detail::kTwoPi) {
-        size_t iMax1 = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw - detail::kTwoPi) - keys.begin());
-        size_t iMin2 = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw) - keys.begin());
-        if (mainOptions.debugLeavesTime) {
-            accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
-        }
-        return {0, iMax1, iMin2, count, true, OrderType::K0};
-    }
+    // if (kMaxRaw >= detail::kTwoPi) {
+    //     size_t iMax1 = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw - detail::kTwoPi) - keys.begin());
+    //     size_t iMin2 = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw) - keys.begin());
+    //     if (mainOptions.debugLeavesTime) {
+    //         accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
+    //     }
+    //     return {0, iMax1, iMin2, count, true, OrderType::K0};
+    // }
 
-    size_t iMin = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw) - keys.begin());
-    size_t iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
+    // size_t iMin = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw) - keys.begin());
+    // size_t iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
+    size_t iMin = branchless_lower_bound (keys, kMinRaw);
+    size_t iMax = branchless_upper_bound (keys, kMaxRaw);
 
     if (mainOptions.debugLeavesTime) {
         accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();

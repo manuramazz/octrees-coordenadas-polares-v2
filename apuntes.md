@@ -86,9 +86,14 @@ ESTRATEGIA REFACTORIZACIÓN CÓDIGO
 
 
 SITUACIÓN ACTUAL
-- Faltan las funciones de debug leaves en linear octree
-- Luego integrar todo en neighborsbenchmark
-- Probarlo ya
+- Quitar wrapper de second range.
+- Implementar lower/upper bound manual
+- Mandar al cesga
+Mañana domingo 31/05 
+- construir gráficas
+- Mirar si tiempos de ejecución totales se ejecutaron
+- programar correo para lunes
+- Rezar...
     
 
 

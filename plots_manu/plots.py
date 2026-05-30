@@ -485,6 +485,119 @@ def plot_key_distribution(csv_path: str, save: bool = False) -> None:
 ##########################################################
 ################ GRAFICAS DE DEBUG LEAVES ################
 ##########################################################
+def analyze_speedup_and_timing_separated(csv_path: str, save: bool = False, filename: str = ""):
+    df = pd.read_csv(csv_path)
+    if not filename:
+        filename = Path(csv_path).stem
+        filename = filename.split('-')[0] 
+    
+    # Detectar si hay columnas de configuración
+    has_threshold = 'threshold' in df.columns
+    has_max_leaf  = 'maxPointsLeaf' in df.columns
+
+    # Construir etiqueta de configuración por fila
+    def config_label(row):
+        parts = []
+        if has_threshold:
+            parts.append(f'thr={int(row["threshold"])}')
+        if has_max_leaf:
+            parts.append(f'maxL={int(row["maxPointsLeaf"])}')
+        return ' | '.join(parts) if parts else 'default'
+
+    df['config'] = df.apply(config_label, axis=1)
+    
+    # =========================================================================
+    # TRUCO DE INGENIERÍA: FUSIÓN DE FILAS DE PARCHE CON FILAS REALES
+    # =========================================================================
+    # Una nueva consulta siempre empieza cuando get_range_time > 0 o loop_time > 0.
+    # Las líneas de parche tienen ambos campos a 0.0, por lo que se agruparán con su consulta real.
+    is_new_query = (df['get_range_time'] > 0) | (df['loop_time'] > 0)
+    df['query_id'] = is_new_query.cumsum()
+    
+    time_cols = ['get_range_time', 'loop_time', 'projectionTime', 'binarySearchTime']
+    meta_cols = [c for c in df.columns if c not in time_cols and c != 'query_id']
+    
+    # Fusionamos las líneas sumando sus componentes de tiempo
+    df_collapsed = df.groupby('query_id').agg({
+        **{col: 'first' for col in meta_cols},
+        **{col: 'sum' for col in time_cols}
+    }).reset_index(drop=True)
+    
+    configs = df_collapsed['config'].unique()
+    
+    # Ahora calculamos las medias reales sobre el dataframe colapsado y limpio
+    avg_times = df_collapsed.groupby(['kernel', 'radius', 'mode'])[['get_range_time', 'loop_time', 'projectionTime', 'binarySearchTime']].mean().reset_index()
+    
+    # Calcular Speedup por búsqueda individual utilizando datos colapsados
+    reference = df_collapsed[df_collapsed['mode'] == 'none'].groupby(['kernel', 'radius'])['loop_time'].mean().reset_index()
+    reference.rename(columns={'loop_time': 'loop_time_none'}, inplace=True)
+    
+    df_speedup = pd.merge(df_collapsed, reference, on=['kernel', 'radius'])
+    
+    df_speedup['total_time'] = df_speedup['get_range_time'] + df_speedup['loop_time']
+    df_speedup['speedup'] = df_speedup['loop_time_none'] / df_speedup['total_time']
+    
+    df_speedup_filtered = df_speedup[df_speedup['mode'] != 'none']
+
+    # --- GRÁFICA 1: TIEMPO DESGLOSADO (Barras Apiladas Quirúrgicas) ---
+    kernels = avg_times['kernel'].unique()
+    for kern in kernels:
+        df_kern = avg_times[avg_times['kernel'] == kern]
+        
+        modes = df_kern['mode'].unique()
+        radii = sorted(df_kern['radius'].unique())
+        
+        fig, ax = plt.subplots(figsize=(12, 7))
+        
+        width = 0.25  # Ancho de las barras
+        multiplier = 0
+        
+        for mode in modes:
+            df_m = df_kern[df_kern['mode'] == mode]
+            # Asegurar orden de radios
+            df_m = df_m.set_index('radius').reindex(radii).reset_index()
+            
+            offset = width * multiplier
+            
+            # FILTRADO CONDICIONAL DE APILAMIENTO SOLICITADO
+            if mode in ['polar', 'cartesian']:
+                # Nivel 1 (Base): Tiempo de proyección matemática
+                p1 = ax.bar(np.arange(len(radii)) + offset, df_m['projectionTime'], width, 
+                            label=f'{mode} (Proyección)', alpha=0.5)
+                
+                # Nivel 2 (Medio): Tiempo de búsqueda binaria (apilado sobre proyección)
+                p2 = ax.bar(np.arange(len(radii)) + offset, df_m['binarySearchTime'], width, 
+                            bottom=df_m['projectionTime'], label=f'{mode} (Búsq. Binaria)', alpha=0.7)
+                
+                # Nivel 3 (Techo): Tiempo de escaneo e inserción (apilado sobre el total del selector)
+                selector_total = df_m['projectionTime'] + df_m['binarySearchTime']
+                p3 = ax.bar(np.arange(len(radii)) + offset, df_m['loop_time'], width, 
+                            bottom=selector_total, label=f'{mode} (Loop)', alpha=0.9)
+            else:
+                # Modo 'none' u otros fallbacks (Mantiene el comportamiento tradicional)
+                p1 = ax.bar(np.arange(len(radii)) + offset, df_m['get_range_time'], width, 
+                            label=f'{mode} (Selector)', alpha=0.6)
+                
+                p2 = ax.bar(np.arange(len(radii)) + offset, df_m['loop_time'], width, 
+                            bottom=df_m['get_range_time'], label=f'{mode} (Loop)', alpha=0.9)
+            
+            multiplier += 1
+            
+        ax.set_ylabel('Tiempo Medio (Segundos)')
+        ax.set_title(f'Desglose Quirúrgico de Tiempo: Selector Interno vs Loop\nKernel: {kern.upper()} | Dataset: {filename} | Config: {", ".join(configs)}')
+        ax.set_xticks(np.arange(len(radii)) + width, [f'r={r}' for r in radii])
+        ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+        ax.grid(axis='y', alpha=0.3)
+        
+        plt.tight_layout()
+        if save:
+            out_path = Path(csv_path).parent / f'{filename}_{kern}_time_breakdown.png'
+            plt.savefig(out_path, dpi=150, bbox_inches='tight')
+            plt.close()
+            print(f'Guardado: {out_path}')
+        else:
+            plt.show()
+        plt.close(fig)
 
 def analyze_speedup_and_timing(csv_path: str, save: bool = False, filename: str = ""):
     df = pd.read_csv(csv_path)

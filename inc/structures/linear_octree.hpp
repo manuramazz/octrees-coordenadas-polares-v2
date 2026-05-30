@@ -1142,38 +1142,34 @@ public:
             }
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-            if (leafIndex >= 0) {
-                // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
-                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+            // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
+            const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
 
-                // Si hubo poda real, escaneamos los intervalos óptimos sobre el puntero polar
-                if (range.count() < count) {
-                    // Primer intervalo podado (Aritmética de punteros directa, prefetcher impecable)
-                    for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
-                        if (k.isInside(this->polarPoints[i])) {
-                            ptsInside.push_back(i);
-                        }
-                    }
-                    // Segundo intervalo podado (Wrap-around angular)
-                    if (range.hasSecond) {
-                        for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
-                            if (k.isInside(this->polarPoints[i])) {
-                                ptsInside.push_back(i);
-                            }
-                        }
-                    }
-                    return;
-                }
-            }
-
-            // Fallback si la búsqueda binaria no pudo podar nada: recorremos secuencialmente polarData
-            // para mantener la integridad de los índices y evitar mezclas espaciales.
-            for (size_t i = startIndex; i < endIndex; ++i) {
+            // Intervalo podado (Aritmética de punteros directa, prefetcher impecable)
+            for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
                 if (k.isInside(this->polarPoints[i])) {
                     ptsInside.push_back(i);
                 }
             }
-            return;
+                    // Segundo intervalo podado (Wrap-around angular)
+                    // if (range.hasSecond) {
+                    //     for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
+                    //         if (k.isInside(this->polarPoints[i])) {
+                    //             ptsInside.push_back(i);
+                    //         }
+                    //     }
+                    // }
+                    // return;
+            
+
+            // // Fallback si la búsqueda binaria no pudo podar nada: recorremos secuencialmente polarData
+            // // para mantener la integridad de los índices y evitar mezclas espaciales.
+            // for (size_t i = startIndex; i < endIndex; ++i) {
+            //     if (k.isInside(this->polarPoints[i])) {
+            //         ptsInside.push_back(i);
+            //     }
+            // }
+            // return;
         };
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
         return ptsInside;
@@ -1321,13 +1317,13 @@ public:
                     }
                 }
                 // Segundo intervalo podado (Wrap-around angular)
-                if (range.hasSecond) {
-                    for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
-                        if (k.isInside(this->polarPoints[i])) {
-                            ptsInside.push_back(i);
-                        }
-                    }
-                }
+                // if (range.hasSecond) {
+                //     for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
+                //         if (k.isInside(this->polarPoints[i])) {
+                //             ptsInside.push_back(i);
+                //         }
+                //     }
+                // }
                 if(mainOptions.debugRanges) {
                     size_t neighborsFound = ptsInside.size() - sizeBefore;
                     writeDetailedLeafRangeLog(leafIndex, getKernelName(k), range, mode, searchRadius, endIndex - startIndex, neighborsFound);
@@ -1486,39 +1482,14 @@ public:
             }
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-            if (leafIndex >= 0) {
-                // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
-                getRangeWatcher.start();
-                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
-                getRangeWatcher.stop();
-                accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();               
-                // Si hubo poda real, escaneamos los intervalos óptimos sobre el puntero polar
-                if (range.count() < count) {
-                    // Primer intervalo podado (Aritmética de punteros directa, prefetcher impecable)
-                    loopWatcher.start();
-                    for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
-                        if (k.isInside(this->polarPoints[i])) {
-                            ptsInside.push_back(i);
-                        }
-                    }
-                    // Segundo intervalo podado (Wrap-around angular)
-                    if (range.hasSecond) {
-                        for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
-                            if (k.isInside(this->polarPoints[i])) {
-                                ptsInside.push_back(i);
-                            }
-                        }
-                    }
-                    loopWatcher.stop();
-                    accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                    return;
-                }
-            }
-
-            // Fallback si la búsqueda binaria no pudo podar nada: recorremos secuencialmente polarData
-            // para mantener la integridad de los índices y evitar mezclas espaciales.
+            // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
+            getRangeWatcher.start();
+            const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+            getRangeWatcher.stop();
+            accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();     
             loopWatcher.start();
-            for (size_t i = startIndex; i < endIndex; ++i) {
+            // Intervalo podado (Aritmética de punteros directa, prefetcher impecable)
+            for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
                 if (k.isInside(this->polarPoints[i])) {
                     ptsInside.push_back(i);
                 }
@@ -1588,44 +1559,31 @@ public:
             }
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-            if (leafIndex >= 0) {
-                // Evaluamos el mejor rango entre X, Y y Z
-                getRangeWatcher.start();
-                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
-                getRangeWatcher.stop();
-                accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
+            // Evaluamos el mejor rango entre X, Y y Z
+            getRangeWatcher.start();
+            const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+            getRangeWatcher.stop();
+            accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
 
-                if (range.count() < count) {
-                    // Selección del puntero crudo del eje óptimo en O(1)
-                    loopWatcher.start();
-                    const Point* axisData = nullptr;
-                    if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
-                    else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
-                    else                                   axisData = this->cartesianPointsZ;
-
-                    // Bucle de escaneo lineal sobre el eje óptimo podado
-                    for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
-                        const Point& p = axisData[i];
-                        if (k.isInside(p)) {
-                            ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
-                        }
-                    }
-                    loopWatcher.stop();
-                    accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                    return;
-                }
-            }
-
-            // Fallback de rescate si ningún eje cartesiano podó la hoja (recorremos el vector base del Octree)
+            // Selección del puntero crudo del eje óptimo en O(1)
             loopWatcher.start();
-            for (size_t i = startIndex; i < endIndex; ++i) {
-                if (k.isInside(this->points[i])) {
-                    ptsInside.push_back(i);
+            const Point* axisData = nullptr;
+            if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
+            else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
+            else                                   axisData = this->cartesianPointsZ;
+
+            // Bucle de escaneo lineal sobre el eje óptimo podado
+            for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
+                const Point& p = axisData[i];
+                if (k.isInside(p)) {
+                    ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
                 }
             }
             loopWatcher.stop();
             accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
             return;
+            
+            
         };
         singleTraversal(checkBoxIntersect, findAndInsertPoints);
         writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
