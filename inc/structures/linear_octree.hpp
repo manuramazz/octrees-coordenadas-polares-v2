@@ -25,11 +25,6 @@
 #include "neighbor_set.hpp"
 #include "structures/octree_types.hpp"
 
-namespace {
-    bool hasLoggedThisSearch = false;
-    double accumulatedGetRangeTime = 0.0;
-    double accumulatedLoopTime = 0.0;
-}
 
 /**
 * @class LinearOctree
@@ -46,6 +41,15 @@ namespace {
 * 
 */
 
+
+// Declared out of the class: function to create the file path (for the time mesurement in debug-leaves-time mode)
+// This mode mesuares separately the time of the range selection and the time of the loop over the points in the leaf, to be able to see how much time we are spending in each part and if the optimizations on range selection are effective.
+// the other debug mode (debug-ranges) prints the ranges selected for each leaf, as well as the total points of the leaf and the number of points that were selected as neighbors.
+namespace {
+    bool hasLoggedThisSearch = false;
+    double accumulatedGetRangeTime = 0.0;
+    double accumulatedLoopTime = 0.0;
+}
 
 inline std::filesystem::path getFindAndInsertPointsLogPath() {
     static std::optional<std::filesystem::path> rangeTimingLogPath;
@@ -1044,11 +1048,15 @@ public:
     }
 
 
-    /** ##############################################################################################################################
-     * ############################  ALGORITMO PRUNE CON TODAS LAS VERSIONES PARA REORDENACIONES #####################################
+    /** #############################################################################################################################
+     * ################################################  NEIGHBORS PRUNE ALGORITHM ##################################################
      * ##############################################################################################################################
      * @brief Search neighbors function. Given kernel that already contains a point and a radius, return the points inside the region.
      * Note that neighborsStruct is generally faster, so only use this function if you don't want your result encapsultated on NeighborSet.
+     * 
+     * @details This algorithm includes the local reorders optimizations. It is separeted in distinct functions to improve efficiency and also readability. 
+     * Each function is called depending on the mode that is being used. 
+     * There are also included functions to log the ranges (debug-ranges mode) and the time taken by each step (debug-leaves-time mode).
      * 
      * @param k specific kernel that contains the data of the region (center and radius)
      * @return Points inside the given kernel type.
@@ -1142,10 +1150,10 @@ public:
             }
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-            // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
+            // Range selector is called. The struct returned contains the min and max indices.
             const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
 
-            // Intervalo podado (Aritmética de punteros directa, prefetcher impecable)
+            // Pruned interval (loop is identical to the base one, but with the pruned range instead of the whole leaf range)
             for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
                 if (k.isInside(this->polarPoints[i])) {
                     ptsInside.push_back(i);
@@ -1224,27 +1232,29 @@ public:
             }
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-            // Evaluamos el mejor rango entre X, Y y Z
+            // The range selector is called. The struct returned contains the min and max indices of the optimal axis to scan.
             const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
 
             if (range.count() < count) {
-                // Selección del puntero crudo del eje óptimo en O(1)
+                // pointer selection of the leaf start based on the optimal axis based on the object returned by getRange
                 const Point* axisData = nullptr;
                 if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
                 else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
                 else                                   axisData = this->cartesianPointsZ;
 
-                // Bucle de escaneo lineal sobre el eje óptimo podado
+                // Scan loop of the pruning range
+                // Note: since we are using differente reorders in the same mode, it is imposible recollect the neighbors afterwards if we store the indexes,
+                // so we store the index in the original points vector (stored in the id field of the point) instead to be able to recollect them later.
                 for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
                     const Point& p = axisData[i];
                     if (k.isInside(p)) {
-                        ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
+                        ptsInside.push_back(p.id());
                     }
                 }
                 return;
             }
 
-            // Fallback de rescate si ningún eje cartesiano podó la hoja (recorremos el vector base del Octree)
+            // Fallback if there was no pruning (we can use the original points and store the indexes directly in this case)
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(this->points[i])) {
                     ptsInside.push_back(i);
@@ -1305,10 +1315,8 @@ public:
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
             if (leafIndex >= 0) {
-                // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
                 const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
 
-                // Entramos siempre para poder loggear el rango aunque no haya poda
                 for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
                     if (k.isInside(this->polarPoints[i])) {
                         ptsInside.push_back(i);
@@ -1329,8 +1337,6 @@ public:
                 return;
             }
 
-            // Fallback si la búsqueda binaria no pudo podar nada: recorremos secuencialmente polarData
-            // para mantener la integridad de los índices y evitar mezclas espaciales.
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(this->polarPoints[i])) {
                     ptsInside.push_back(i);
@@ -1393,20 +1399,17 @@ public:
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
             if (leafIndex >= 0) {
-                // Evaluamos el mejor rango entre X, Y y Z
                 const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
 
-                // Selección del puntero crudo del eje óptimo en O(1)
                 const Point* axisData = nullptr;
                 if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
                 else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
                 else                                   axisData = this->cartesianPointsZ;
 
-                // Bucle de escaneo lineal sobre el eje óptimo podado
                 for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
                     const Point& p = axisData[i];
                     if (k.isInside(p)) {
-                        ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
+                        ptsInside.push_back(p.id());
                     }
                 }
                 if(mainOptions.debugRanges) {
@@ -1416,7 +1419,6 @@ public:
                 return;
             }
 
-            // Fallback de rescate si ningún eje cartesiano podó la hoja (recorremos el vector base del Octree)
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(this->points[i])) {
                     ptsInside.push_back(i);
@@ -1480,13 +1482,12 @@ public:
             }
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-            // Invocamos el selector de rangos (que internamente usa las claves de búsqueda binaria)
             getRangeWatcher.start();
             const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
             getRangeWatcher.stop();
             accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();     
             loopWatcher.start();
-            // Intervalo podado (Aritmética de punteros directa, prefetcher impecable)
+
             for (size_t i = range.iMin  + startIndex; i < range.iMax  + startIndex; ++i) {
                 if (k.isInside(this->polarPoints[i])) {
                     ptsInside.push_back(i);
@@ -1557,24 +1558,21 @@ public:
             }
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-            // Evaluamos el mejor rango entre X, Y y Z
             getRangeWatcher.start();
             const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
             getRangeWatcher.stop();
             accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
 
-            // Selección del puntero crudo del eje óptimo en O(1)
             loopWatcher.start();
             const Point* axisData = nullptr;
             if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
             else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
             else                                   axisData = this->cartesianPointsZ;
 
-            // Bucle de escaneo lineal sobre el eje óptimo podado
             for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
                 const Point& p = axisData[i];
                 if (k.isInside(p)) {
-                    ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
+                    ptsInside.push_back(p.id());
                 }
             }
             loopWatcher.stop();

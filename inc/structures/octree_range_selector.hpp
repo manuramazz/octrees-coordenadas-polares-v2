@@ -18,11 +18,22 @@
 #include "octree_types.hpp"
 #include "linear_octree.hpp"
 
+/**
+ * @brief Operations for selecting the range of points to evaluate in a leaf based on the query and the kernel.
+ * 
+ * @details Includes two functions. The first one, `bestRangeCartesian`, evaluates the 3 coordinate axes independently and selects the best range of points to evaluate based on the smallest range obtained from any of the axes. 
+ * The second one, `bestRangePolar`, uses polar coordinates. Each point is defined by its azimuthal angle from the leaf center. 
+ * The function computes the angular range that could contain points based on the position and radius of the query, and then finds the corresponding range of points in the leaf.
+ * Both functions return a `PrunedRange` structure that contains the indices of the points to evaluate and additional information about the pruning process.
+ * 
+ */
+
 inline std::filesystem::path getFindAndInsertPointsLogPath();
 // ---------------------------------------------------------------
 
-const double UMBRAL_PCT_PODA = 0.5; // Si el rango seleccionado es menor que este porcentaje del total, se devuelve ese rango sin buscar en el resto de claves
+const double UMBRAL_PCT_PODA = 0.5; // If the pruned range is smaller than this percentage of the total points, we consider it a good pruning and can early exit.
 
+// ########## Functions for time measurement in debug mode ##########
 namespace {
     double accumulatedProjectionTime = 0.0;
     double accumulatedBinarySearchTime = 0.0;
@@ -74,9 +85,11 @@ inline void writeRangeSelectorProfileLog(const std::string& kernelName, double r
             << std::to_string(mainOptions.maxPointsLeaf) << "\n";
 }
 
+// ###### End of functions for time measurement #########
+
 
 // =========================================================================
-// FUNCIONES DE BÚSQUEDA BINARIA SIN SALTOS (BRANCHLESS)
+// Binary searches (BRANCHLESS)
 // =========================================================================
 inline size_t branchless_lower_bound(const std::vector<double>& keys, double val) {
     size_t base = 0;
@@ -111,7 +124,7 @@ inline size_t branchless_upper_bound(const std::vector<double>& keys, double val
 }
 
 // ###########################################################################################
-// ########################## MODO CARTESIANO  ###############################
+// ########################## CARTESIAN MODE  ###############################
 // ###########################################################################################
 template<typename Octree_t, typename Reordered_t>
 inline PrunedRange bestRangeCartesian(
@@ -125,9 +138,15 @@ inline PrunedRange bestRangeCartesian(
     const Vector& leafRadii)
 {
     const Point& center = octree.getLeafCenter(leaf);
-    PrunedRange best{0, count, 0, 0, false, OrderType::K0};
     const double eps = 1e-9;
-    // Evaluamos los 3 ejes de forma directa
+
+    OrderType bestOrder = OrderType::K0;
+    double minIntervalSpan = std::numeric_limits<double>::max();
+    double bestKMin = 0.0;
+    double bestKMax = 0.0;
+    bool anyAxisPruned = false;
+
+    // Loop to find the best axis for pruning based on the smallest space interval span
     for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
         double qCoord = 0.0;
         double hRadius = 0.0;
@@ -147,48 +166,52 @@ inline PrunedRange bestRangeCartesian(
             continue;
         }
 
-
-        const auto& keys = reordered.getLeafKeys(leaf, order);
-        if (keys.empty()) {
-            continue;
-        }
-
-        const double firstKey = keys.front();
-        const double lastKey  = keys.back();
-
         const double kMin = qCoord - radius;
         const double kMax = qCoord + radius;
+        
 
-        size_t iMin = 0;
-        if (kMin > firstKey) {
-            // iMin = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMin) - keys.begin());
-            iMin = branchless_lower_bound (keys, kMin);
-        }
+        double currentSpan = kMax - kMin;
 
-        size_t iMax = count;
-        if (kMax < lastKey) {
-            // iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMax) - keys.begin());
-            iMax = branchless_upper_bound (keys, kMax);
-        }
-
-        // 5. EVALUACIÓN DEL MEJOR RANGO
-        PrunedRange r{iMin, iMax, 0, 0, false, order};
-        const size_t rangeCount = r.count();
-
-        if (rangeCount < best.count()) {
-            best = r;
-            // Early exit si la poda es lo suficientemente agresiva
-            if ((static_cast<double>(rangeCount) / count) <= UMBRAL_PCT_PODA) {
-                return best;
-            }
+        if (currentSpan < minIntervalSpan) {
+            minIntervalSpan = currentSpan;
+            bestKMin = kMin;
+            bestKMax = kMax;
+            bestOrder = order;
+            anyAxisPruned = true;
         }
     }
 
-    return best;
+    // No pruning -> return full 
+    if (!anyAxisPruned) {
+        return {0, count, 0, 0, false, OrderType::K0};
+    }
+
+    // Once selected the best axis, we access their keys
+    const auto& keys = reordered.getLeafKeys(leaf, bestOrder);
+    if (keys.empty()) {
+        return {0, count, 0, 0, false, bestOrder};
+    }
+
+    const double firstKey = keys.front();
+    const double lastKey  = keys.back();
+
+    // Binary searches on the best axis (if needed)
+    size_t iMin = 0;
+    if (bestKMin > firstKey) {
+        iMin = branchless_lower_bound(keys, bestKMin);
+    }
+
+    size_t iMax = count;
+    if (bestKMax < lastKey) {
+        iMax = branchless_upper_bound(keys, bestKMax);
+    }
+
+    return {iMin, iMax, 0, 0, false, bestOrder};
 }
 
+
 // ###########################################################################################
-// ############################ MODO POLAR ##################################
+// ############################ POLAR MODE ##################################
 // ###########################################################################################
 template<typename Octree_t, typename Reordered_t>
 inline PrunedRange bestRangePolar(
@@ -259,7 +282,7 @@ inline PrunedRange bestRangePolar(
     // size_t iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
     size_t iMin = branchless_lower_bound (keys, kMinRaw);
     size_t iMax = branchless_upper_bound (keys, kMaxRaw);
-    
+
     return {iMin, iMax, 0, 0, false, OrderType::K0};
 }
 
@@ -275,7 +298,7 @@ inline PrunedRange bestRangePolar(
 
 
 // ###########################################################################################
-// ########################## MODOS DEBUG  ###############################
+// ########################## DEBUG MODE (cartesian)  ###############################
 // ###########################################################################################
 template<typename Octree_t, typename Reordered_t>
 inline PrunedRange bestRangeCartesianDebug(
@@ -378,7 +401,7 @@ inline PrunedRange bestRangeCartesianDebug(
 }
 
 // ###########################################################################################
-// ############################ MODO POLAR ##################################
+// ############################ DEBUG MODE (polar) ##################################
 // ###########################################################################################
 template<typename Octree_t, typename Reordered_t>
 inline PrunedRange bestRangePolarDebug(

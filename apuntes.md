@@ -86,15 +86,8 @@ ESTRATEGIA REFACTORIZACIÓN CÓDIGO
 
 
 SITUACIÓN ACTUAL
-- Quitar wrapper de second range.
-- Implementar lower/upper bound manual
-- Mandar al cesga
-Mañana domingo 31/05 
-- construir gráficas
-- Mirar si tiempos de ejecución totales se ejecutaron
-- programar correo para lunes
-- Rezar...
-    
+- Cambiar modo cartesiano -> solo una búsqueda binaria
+- Seguir mejorando gráficas (de tiempos totales)
 
 
 

@@ -1,0 +1,531 @@
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.6.1)  1 JUN 2026 12:42
+entering extended mode
+ restricted \write18 enabled.
+ file:line:error style messages enabled.
+ %&-line parsing enabled.
+**/home/manu/proyecto_tfg/octrees-coordenadas-polares-v2/GrEI_TFG_Modelo_A_Memoria/traballo.tex
+(/home/manu/proyecto_tfg/octrees-coordenadas-polares-v2/GrEI_TFG_Modelo_A_Memoria/traballo.tex
+LaTeX2e <2023-11-01> patch level 1
+L3 programming layer <2024-01-22>
+(/usr/share/texlive/texmf-dist/tex/latex/base/book.cls
+Document Class: book 2023/05/17 v1.4n Standard LaTeX document class
+(/usr/share/texlive/texmf-dist/tex/latex/base/bk12.clo
+File: bk12.clo 2023/05/17 v1.4n Standard LaTeX file (size option)
+)
+\c@part=\count187
+\c@chapter=\count188
+\c@section=\count189
+\c@subsection=\count190
+\c@subsubsection=\count191
+\c@paragraph=\count192
+\c@subparagraph=\count193
+\c@figure=\count194
+\c@table=\count195
+\abovecaptionskip=\skip48
+\belowcaptionskip=\skip49
+\bibindent=\dimen140
+) (/usr/share/texlive/texmf-dist/tex/latex/base/inputenc.sty
+Package: inputenc 2021/02/14 v1.3d Input encoding file
+\inpenc@prehook=\toks17
+\inpenc@posthook=\toks18
+) (/usr/share/texlive/texmf-dist/tex/generic/babel/babel.sty
+Package: babel 2024/01/07 v24.1 The Babel package
+\babel@savecnt=\count196
+\U@D=\dimen141
+\l@unhyphenated=\language8
+ (/usr/share/texlive/texmf-dist/tex/generic/babel/txtbabel.def)
+\bbl@readstream=\read2
+\bbl@dirlevel=\count197
+ (/usr/share/texlive/texmf-dist/tex/generic/babel-spanish/spanish.ldf
+Language: spanish.ldf 2021/05/27 v5.0q Spanish support from the babel system
+\es@quottoks=\toks19
+\es@quotdepth=\count198
+Package babel Info: Making " an active character on input line 570.
+Package babel Info: Making . an active character on input line 675.
+Package babel Info: Making < an active character on input line 722.
+Package babel Info: Making > an active character on input line 722.
+)) (/usr/share/texlive/texmf-dist/tex/generic/babel/locale/es/babel-spanish.tex
+Package babel Info: Importing font and identification data for spanish
+(babel)             from babel-es.ini. Reported on input line 11.
+) (/usr/share/texlive/texmf-dist/tex/latex/graphics/graphicx.sty
+Package: graphicx 2021/09/16 v1.2d Enhanced LaTeX Graphics (DPC,SPQR)
+ (/usr/share/texlive/texmf-dist/tex/latex/graphics/keyval.sty
+Package: keyval 2022/05/29 v1.15 key=value parser (DPC)
+\KV@toks@=\toks20
+) (/usr/share/texlive/texmf-dist/tex/latex/graphics/graphics.sty
+Package: graphics 2022/03/10 v1.4e Standard LaTeX Graphics (DPC,SPQR)
+ (/usr/share/texlive/texmf-dist/tex/latex/graphics/trig.sty
+Package: trig 2021/08/11 v1.11 sin cos tan (DPC)
+) (/usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/graphics.cfg
+File: graphics.cfg 2016/06/04 v1.11 sample graphics configuration
+)
+Package graphics Info: Driver file: pdftex.def on input line 107.
+ (/usr/share/texlive/texmf-dist/tex/latex/graphics-def/pdftex.def
+File: pdftex.def 2022/09/22 v1.2b Graphics/color driver for pdftex
+))
+\Gin@req@height=\dimen142
+\Gin@req@width=\dimen143
+) (/usr/share/texlive/texmf-dist/tex/latex/graphics/epsfig.sty
+Package: epsfig 2017/06/25 v1.7b (e)psfig emulation (SPQR)
+\epsfxsize=\dimen144
+\epsfysize=\dimen145
+) (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/amssymb.sty
+Package: amssymb 2013/01/14 v3.01 AMS font symbols
+ (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/amsfonts.sty
+Package: amsfonts 2013/01/14 v3.01 Basic AMSFonts support
+\@emptytoks=\toks21
+\symAMSa=\mathgroup4
+\symAMSb=\mathgroup5
+LaTeX Font Info:    Redeclaring math symbol \hbar on input line 98.
+LaTeX Font Info:    Overwriting math alphabet `\mathfrak' in version `bold'
+(Font)                  U/euf/m/n --> U/euf/b/n on input line 106.
+)) (/usr/share/texlive/texmf-dist/tex/latex/eurosym/eurosym.sty
+Package: eurosym 1998/08/06 v1.1 European currency symbol ``Euro''
+\@eurobox=\box51
+) (/usr/share/texlive/texmf-dist/tex/latex/float/float.sty
+Package: float 2001/11/08 v1.3d Float enhancements (AL)
+\c@float@type=\count199
+\float@exts=\toks22
+\float@box=\box52
+\@float@everytoks=\toks23
+\@floatcapt=\box53
+) (/usr/share/texlive/texmf-dist/tex/latex/base/latexsym.sty
+Package: latexsym 1998/08/17 v2.2e Standard LaTeX package (lasy symbols)
+\symlasy=\mathgroup6
+LaTeX Font Info:    Overwriting symbol font `lasy' in version `bold'
+(Font)                  U/lasy/m/n --> U/lasy/b/n on input line 52.
+) (./a4.sty
+Package: a4 2004/04/15 v1.2g A4 based page layout
+) (/usr/share/texlive/texmf-dist/tex/latex/listings/listings.sty
+\lst@mode=\count266
+\lst@gtempboxa=\box54
+\lst@token=\toks24
+\lst@length=\count267
+\lst@currlwidth=\dimen146
+\lst@column=\count268
+\lst@pos=\count269
+\lst@lostspace=\dimen147
+\lst@width=\dimen148
+\lst@newlines=\count270
+\lst@lineno=\count271
+\lst@maxwidth=\dimen149
+ (/usr/share/texlive/texmf-dist/tex/latex/listings/lstmisc.sty
+File: lstmisc.sty 2023/02/27 1.9 (Carsten Heinz)
+\c@lstnumber=\count272
+\lst@skipnumbers=\count273
+\lst@framebox=\box55
+) (/usr/share/texlive/texmf-dist/tex/latex/listings/listings.cfg
+File: listings.cfg 2023/02/27 1.9 listings configuration
+))
+Package: listings 2023/02/27 1.9 (Carsten Heinz)
+ (/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
+File: l3backend-pdftex.def 2024-01-04 L3 backend support: PDF output (pdfTeX)
+\l__color_backend_stack_int=\count274
+\l__pdf_internal_box=\box56
+) (./traballo.aux (./capitulos/titulo.aux)
+LaTeX Info: Redefining \. on input line 9.
+LaTeX Info: Redefining \% on input line 9.
+ (./capitulos/certificacion.aux) (./capitulos/agradecementos.aux) (./capitulos/resumo.aux) (./capitulos/introducion.aux) (./capitulos/cap2.aux) (./capitulos/cap3.aux) (./capitulos/cap4.aux) (./capitulos/cap5.aux) (./capitulos/exemplos.aux) (./capitulos/conclusions.aux) (./capitulos/apendicea.aux) (./capitulos/apendiceb.aux) (./capitulos/licenza.aux) (./capitulos/bibliografia.aux))
+\openout1 = `traballo.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 32.
+LaTeX Font Info:    ... okay on input line 32.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 32.
+LaTeX Font Info:    ... okay on input line 32.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 32.
+LaTeX Font Info:    ... okay on input line 32.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 32.
+LaTeX Font Info:    ... okay on input line 32.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 32.
+LaTeX Font Info:    ... okay on input line 32.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 32.
+LaTeX Font Info:    ... okay on input line 32.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 32.
+LaTeX Font Info:    ... okay on input line 32.
+LaTeX Info: Redefining \. on input line 32.
+LaTeX Info: Redefining \% on input line 32.
+ (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
+[Loading MPS to PDF converter (version 2006.09.02).]
+\scratchcounter=\count275
+\scratchdimen=\dimen150
+\scratchbox=\box57
+\nofMPsegments=\count276
+\nofMParguments=\count277
+\everyMPshowfont=\toks25
+\MPscratchCnt=\count278
+\MPscratchDim=\dimen151
+\MPnumerator=\count279
+\makeMPintoPDFobject=\count280
+\everyMPtoPDFconversion=\toks26
+) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
+Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
+Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
+ (/usr/share/texlive/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
+File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
+))
+\c@lstlisting=\count281
+\openout2 = `capitulos/titulo.aux'.
+
+ (./capitulos/titulo.tex
+Package epstopdf Info: Source file: <figuras/logo_usc.eps>
+(epstopdf)                    date: 2026-06-01 09:29:00
+(epstopdf)                    size: 91607 bytes
+(epstopdf)             Output file: <figuras/logo_usc-eps-converted-to.pdf>
+(epstopdf)                    date: 2026-06-01 09:29:00
+(epstopdf)                    size: 22078 bytes
+(epstopdf)             Command: <repstopdf --outfile=figuras/logo_usc-eps-converted-to.pdf figuras/logo_usc.eps>
+(epstopdf)             \includegraphics on input line 6.
+Package epstopdf Info: Output file is already uptodate.
+<figuras/logo_usc-eps-converted-to.pdf, id=1, 589.20125pt x 382.42876pt>
+File: figuras/logo_usc-eps-converted-to.pdf Graphic file (type pdf)
+<use figuras/logo_usc-eps-converted-to.pdf>
+Package pdftex.def Info: figuras/logo_usc-eps-converted-to.pdf  used on input line 6.
+(pdftex.def)             Requested size: 142.26378pt x 92.33913pt.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 20.
+ (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
+File: umsa.fd 2013/01/14 v3.01 AMS symbols A
+)
+LaTeX Font Info:    Trying to load font information for U+msb on input line 20.
+ (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
+File: umsb.fd 2013/01/14 v3.01 AMS symbols B
+)
+LaTeX Font Info:    Trying to load font information for U+lasy on input line 20.
+ (/usr/share/texlive/texmf-dist/tex/latex/base/ulasy.fd
+File: ulasy.fd 1998/08/17 v2.2e LaTeX symbol font definitions
+)) [1
+
+
+{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map} <./figuras/logo_usc-eps-converted-to.pdf>] [2
+
+
+
+]
+\openout2 = `capitulos/certificacion.aux'.
+
+ (./capitulos/certificacion.tex
+Package epstopdf Info: Source file: <figuras/logo_usc.eps>
+(epstopdf)                    date: 2026-06-01 09:29:00
+(epstopdf)                    size: 91607 bytes
+(epstopdf)             Output file: <figuras/logo_usc-eps-converted-to.pdf>
+(epstopdf)                    date: 2026-06-01 09:29:00
+(epstopdf)                    size: 22078 bytes
+(epstopdf)             Command: <repstopdf --outfile=figuras/logo_usc-eps-converted-to.pdf figuras/logo_usc.eps>
+(epstopdf)             \includegraphics on input line 3.
+Package epstopdf Info: Output file is already uptodate.
+File: figuras/logo_usc-eps-converted-to.pdf Graphic file (type pdf)
+<use figuras/logo_usc-eps-converted-to.pdf>
+Package pdftex.def Info: figuras/logo_usc-eps-converted-to.pdf  used on input line 3.
+(pdftex.def)             Requested size: 113.81102pt x 73.87013pt.
+
+Overfull \hbox (3.39912pt too wide) in paragraph at lines 6--7
+[]\OT1/cmr/bx/n/12 D. (No-me da ti-to-ra ou do ti-tor)\OT1/cmr/m/n/12 , Pro-fe-so-r/a do De-par-ta-men-to de Electr^^Soni-
+ []
+
+) [1
+
+] [2
+
+
+
+]
+\openout2 = `capitulos/agradecementos.aux'.
+
+ (./capitulos/agradecementos.tex) [3
+
+
+] [4
+
+
+
+]
+\openout2 = `capitulos/resumo.aux'.
+
+ (./capitulos/resumo.tex) [5
+
+
+] [6
+
+
+
+] (./traballo.toc
+LaTeX Info: Redefining \. on input line 1.
+LaTeX Info: Redefining \% on input line 1.
+)
+\tf@toc=\write3
+\openout3 = `traballo.toc'.
+
+ [7
+
+] [8
+
+] (./traballo.lof
+LaTeX Info: Redefining \. on input line 1.
+LaTeX Info: Redefining \% on input line 1.
+)
+\tf@lof=\write4
+\openout4 = `traballo.lof'.
+
+ [9] [10
+
+] (./traballo.lot
+LaTeX Info: Redefining \. on input line 1.
+LaTeX Info: Redefining \% on input line 1.
+)
+\tf@lot=\write5
+\openout5 = `traballo.lot'.
+
+ [11] [12
+
+]
+\openout2 = `capitulos/introducion.aux'.
+
+ (./capitulos/introducion.tex
+Cap\'{\i }tulo 1.
+) [1
+
+
+]
+LaTeX Info: Redefining \. on input line 53.
+LaTeX Info: Redefining \% on input line 53.
+ [2
+
+
+
+]
+\openout2 = `capitulos/cap2.aux'.
+
+ (./capitulos/cap2.tex
+Cap\'{\i }tulo 2.
+) [3
+
+
+]
+LaTeX Info: Redefining \. on input line 55.
+LaTeX Info: Redefining \% on input line 55.
+
+Overfull \hbox (8.51175pt too wide) has occurred while \output is active
+\OT1/cmr/m/n/12 4 \OT1/cmr/m/sl/12 CAP[]ITULO 2.  ESTADO DE CO[]NECEMENTO DO PROBLEMA A ABORDAR
+ []
+
+[4
+
+
+
+]
+\openout2 = `capitulos/cap3.aux'.
+
+ (./capitulos/cap3.tex
+Cap\'{\i }tulo 3.
+) [5
+
+
+]
+LaTeX Info: Redefining \. on input line 57.
+LaTeX Info: Redefining \% on input line 57.
+ [6
+
+
+
+]
+\openout2 = `capitulos/cap4.aux'.
+
+ (./capitulos/cap4.tex
+Cap\'{\i }tulo 4.
+) [7
+
+
+]
+LaTeX Info: Redefining \. on input line 59.
+LaTeX Info: Redefining \% on input line 59.
+ [8
+
+
+
+]
+\openout2 = `capitulos/cap5.aux'.
+
+ (./capitulos/cap5.tex
+Cap\'{\i }tulo 5.
+) [9
+
+
+]
+LaTeX Info: Redefining \. on input line 61.
+LaTeX Info: Redefining \% on input line 61.
+ [10
+
+
+
+]
+\openout2 = `capitulos/exemplos.aux'.
+
+ (./capitulos/exemplos.tex
+Cap\'{\i }tulo 6.
+[11
+
+
+]
+Package epstopdf Info: Source file: <figuras/figura01.eps>
+(epstopdf)                    date: 2026-06-01 09:29:00
+(epstopdf)                    size: 209408 bytes
+(epstopdf)             Output file: <figuras/figura01-eps-converted-to.pdf>
+(epstopdf)                    date: 2026-06-01 09:29:00
+(epstopdf)                    size: 26680 bytes
+(epstopdf)             Command: <repstopdf --outfile=figuras/figura01-eps-converted-to.pdf figuras/figura01.eps>
+(epstopdf)             \includegraphics on input line 30.
+Package epstopdf Info: Output file is already uptodate.
+<figuras/figura01-eps-converted-to.pdf, id=100, 1060.96375pt x 513.92pt>
+File: figuras/figura01-eps-converted-to.pdf Graphic file (type pdf)
+<use figuras/figura01-eps-converted-to.pdf>
+Package pdftex.def Info: figuras/figura01-eps-converted-to.pdf  used on input line 30.
+(pdftex.def)             Requested size: 426.79134pt x 206.73277pt.
+
+Underfull \vbox (badness 1019) has occurred while \output is active []
+
+LaTeX Info: Redefining \. on input line 55.
+LaTeX Info: Redefining \% on input line 55.
+
+Overfull \hbox (1.62976pt too wide) has occurred while \output is active
+\OT1/cmr/m/n/12 12 \OT1/cmr/m/sl/12 CAP[]ITULO 6.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
+ []
+
+[12 <./figuras/figura01-eps-converted-to.pdf>] (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
+File: lstlang1.sty 2023/02/27 1.9 listings language file
+) (/usr/share/texlive/texmf-dist/tex/latex/listings/lstmisc.sty
+File: lstmisc.sty 2023/02/27 1.9 (Carsten Heinz)
+)
+LaTeX Font Info:    Trying to load font information for OML+cmr on input line 81.
+ (/usr/share/texlive/texmf-dist/tex/latex/base/omlcmr.fd
+File: omlcmr.fd 2023/04/13 v2.5m Standard LaTeX font definitions
+)
+LaTeX Font Info:    Font shape `OML/cmr/m/n' in size <12> not available
+(Font)              Font shape `OML/cmm/m/it' tried instead on input line 81.
+LaTeX Font Info:    Trying to load font information for OMS+cmr on input line 83.
+ (/usr/share/texlive/texmf-dist/tex/latex/base/omscmr.fd
+File: omscmr.fd 2023/04/13 v2.5m Standard LaTeX font definitions
+)
+LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <12> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 83.
+ (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
+File: lstlang1.sty 2023/02/27 1.9 listings language file
+)
+Overfull \hbox (53.36043pt too wide) in paragraph at lines 97--98
+[][][][][][][][][][][][][][][][][][][][][][][][][] 
+ []
+
+)
+LaTeX Info: Redefining \. on input line 62.
+LaTeX Info: Redefining \% on input line 62.
+ [13]
+LaTeX Info: Redefining \. on input line 66.
+LaTeX Info: Redefining \% on input line 66.
+
+Overfull \hbox (1.62976pt too wide) has occurred while \output is active
+\OT1/cmr/m/n/12 14 \OT1/cmr/m/sl/12 CAP[]ITULO 6.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
+ []
+
+[14
+
+
+
+]
+\openout2 = `capitulos/conclusions.aux'.
+
+ (./capitulos/conclusions.tex
+Cap\'{\i }tulo 7.
+) [15
+
+
+]
+LaTeX Info: Redefining \. on input line 71.
+LaTeX Info: Redefining \% on input line 71.
+ [16
+
+
+
+]
+\openout2 = `capitulos/apendicea.aux'.
+
+ (./capitulos/apendicea.tex
+Ap\'{e}ndice A.
+) [17
+
+
+]
+LaTeX Info: Redefining \. on input line 73.
+LaTeX Info: Redefining \% on input line 73.
+ [18
+
+
+
+]
+\openout2 = `capitulos/apendiceb.aux'.
+
+ (./capitulos/apendiceb.tex
+Ap\'{e}ndice B.
+) [19
+
+
+]
+LaTeX Info: Redefining \. on input line 75.
+LaTeX Info: Redefining \% on input line 75.
+ [20
+
+
+
+]
+\openout2 = `capitulos/licenza.aux'.
+
+ (./capitulos/licenza.tex
+Ap\'{e}ndice C.
+) [21
+
+
+]
+LaTeX Info: Redefining \. on input line 77.
+LaTeX Info: Redefining \% on input line 77.
+ [22
+
+
+
+]
+\openout2 = `capitulos/bibliografia.aux'.
+
+ (./capitulos/bibliografia.tex
+Underfull \hbox (badness 1590) in paragraph at lines 7--8
+[]\OT1/cmr/m/n/12 Nvidia CU-DA pro-gram-ming gui-de. Ver-si^^Son 2.0, 2010. Dis-po~nible en
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 10--11
+[]\OT1/cmr/m/n/12 Acceso m^^Sulti-ple por di-vi-si^^Son de c^^Sodi-go. Ar-ti-go da wi-ki-pe-dia
+ []
+
+) [23
+
+
+] (./traballo.aux (./capitulos/titulo.aux)
+LaTeX Info: Redefining \. on input line 9.
+LaTeX Info: Redefining \% on input line 9.
+ (./capitulos/certificacion.aux) (./capitulos/agradecementos.aux) (./capitulos/resumo.aux) (./capitulos/introducion.aux) (./capitulos/cap2.aux) (./capitulos/cap3.aux) (./capitulos/cap4.aux) (./capitulos/cap5.aux) (./capitulos/exemplos.aux) (./capitulos/conclusions.aux) (./capitulos/apendicea.aux) (./capitulos/apendiceb.aux) (./capitulos/licenza.aux) (./capitulos/bibliografia.aux))
+ ***********
+LaTeX2e <2023-11-01> patch level 1
+L3 programming layer <2024-01-22>
+ ***********
+ ) 
+Here is how much of TeX's memory you used:
+ 5855 strings out of 476120
+ 95430 string characters out of 5793658
+ 1939975 words of memory out of 5000000
+ 27696 multiletter control sequences out of 15000+600000
+ 568292 words of font info for 74 fonts, out of 8000000 for 9000
+ 41 hyphenation exceptions out of 8191
+ 57i,8n,65p,583b,1319s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1200.600pk> </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcti1200.600pk></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsl12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt12.pfb>
+Output written on traballo.pdf (37 pages, 229959 bytes).
+PDF statistics:
+ 219 PDF objects out of 1000 (max. 8388607)
+ 142 compressed objects within 2 object streams
+ 0 named destinations out of 1000 (max. 500000)
+ 11 words of extra memory for PDF output out of 10000 (max. 10000000)
+

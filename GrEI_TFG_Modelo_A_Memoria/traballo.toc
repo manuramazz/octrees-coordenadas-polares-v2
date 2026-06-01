@@ -1,0 +1,21 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {chapter}{\numberline {1}Introdución}{1}{}%
+\contentsline {chapter}{\numberline {2}Estado de coñecemento do problema a abordar}{3}{}%
+\contentsline {chapter}{\numberline {3}Metodoloxía}{5}{}%
+\contentsline {chapter}{\numberline {4}Probas}{7}{}%
+\contentsline {chapter}{\numberline {5}Discusión dos resultados}{9}{}%
+\contentsline {chapter}{\numberline {6}Exemplos (eliminar capítulo na versión final)}{11}{}%
+\contentsline {section}{\numberline {6.1}Un exemplo de sección}{11}{}%
+\contentsline {subsection}{\numberline {6.1.1}Un exemplo de subsección}{11}{}%
+\contentsline {subsection}{\numberline {6.1.2}Otro exemplo de subsección}{11}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{11}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{11}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{12}{}%
+\contentsline {section}{\numberline {6.2}Exemplos de figuras e cadros}{12}{}%
+\contentsline {section}{\numberline {6.3}Exemplos de referencias á bibliografía}{12}{}%
+\contentsline {section}{\numberline {6.4}Exemplos de enumeracións}{13}{}%
+\contentsline {chapter}{\numberline {7}Conclusións e posibles ampliacións}{15}{}%
+\contentsline {chapter}{\numberline {A}Manuais técnicos}{17}{}%
+\contentsline {chapter}{\numberline {B}Manuais de usuario}{19}{}%
+\contentsline {chapter}{\numberline {C}Licenza}{21}{}%
+\contentsline {chapter}{Bibliografía}{23}{}%

@@ -5,7 +5,7 @@
 #SBATCH -n 1                 # Un solo "task" (tu script de bash)
 #SBATCH -c 40                # Reservar 40 núcleos (coincide con tu THREADS máximo)
 #SBATCH --mem=20G            # Memoria RAM (ajusta según el peso de Semantic3D)
-#SBATCH -t 01:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
+#SBATCH -t 06:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
 #SBATCH -J octree_bench_v6     # Nombre del trabajo
 #SBATCH -o logs/bench_%j.out # Archivo de salida (crea la carpeta logs antes)
 #SBATCH -e logs/bench_%j.err # Archivo de errores
@@ -16,13 +16,11 @@ module purge
 module load gcc/12.3.0
 module load papi
 
-chmod +x compile.sh
 chmod +x bench_neighbors_reorders.bash
 
 echo "Iniciando benchmark"
 echo "Fecha: $(date)"
 
-bash compile.sh
 bash bench_neighbors_reorders.bash
 
 echo "Benchmark finalizado: $(date)"

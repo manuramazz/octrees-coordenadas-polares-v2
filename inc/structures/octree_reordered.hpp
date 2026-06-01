@@ -16,7 +16,15 @@
 #include "octree_types.hpp"
 #include "main_options.hpp"
 
-
+/** 
+ * @class OctreeReordered
+ * @brief This class calculates and stores the reordered point data for each leaf of the octree based on the specified reordering mode (Cartesian or Polar). It also computes the keys for binary search in the search process.
+ * @details The class provides two main functionalities:
+ * 1. Calculating the keys of the points in each leaf separately based on the selected reordering mode. For Cartesian mode, it calculates the keys based on the X, Y, and Z coordinates. For Polar mode, it calculates the keys based on the azimuthal angle in the XY plane.
+ *    The keys are stored in a structure of vectors that allows for efficient access during the search process.
+ * 2. Building the reordered point data flat structure that contains the points in the order defined by the permutations of the keys. 
+ *    The start of each leaf in this reordered structure corresponds to the original global index of the points in the octree.
+ */
 template<typename Octree_t, typename Container>
 class OctreeReordered {
 public:
@@ -31,9 +39,9 @@ public:
     
     std::vector<LeafKeys> leafKeys;
 
-    // ============================================================
-    // Función de construcción de array plano reordenado (duplicación)
-    // ============================================================
+    // ========================================================================
+    // Build of the reordered vectors (1:1 with original points, no compaction)
+    // =========================================================================
     SortedDataFlat sortedFlat;
     
     void buildSortedDataFlat(
@@ -48,10 +56,9 @@ public:
         const size_t numLeaves = octree.getNumLeaves();
         const size_t totalPoints = points.size();
 
-        // Evaluamos la característica estructural de la clase una sola vez en tiempo de compilación
+        // The building of the sorted data is flexible to permit being used with pointer octrees as well as linear octrees.
         constexpr bool useLeafPoints = requires(Octree_t& o, size_t l) { o.getLeafPoints(l); };
 
-        // Inicializamos y reservamos memoria exacta 1:1 con el vector points original
         if (mode == ReorderMode::Polar) {
             sortedFlat.PointsPolar.resize(totalPoints);
         } else if (mode == ReorderMode::Cartesian) {
@@ -142,7 +149,7 @@ public:
     }
 
     // ============================================================
-    // Función de construcción de permutaciones (NO reordena datos)
+    // Building of permutation and keys vectors
     // ============================================================
 
     void buildLeafPermutations(
@@ -166,9 +173,7 @@ public:
             auto leafPoints = std::vector<size_t>{};
             size_t begin = 0;
             size_t end = 0;
-            // Variantes según el tipo de octree
-            // Ptr expone un array de puntos
-            // Linear expone un rango de índices en el array global de puntos
+            // 
             if constexpr (requires { octree.getLeafPoints(leaf); }) {
                 leafPoints = octree.getLeafPoints(leaf);
                 count = leafPoints.size();
@@ -196,11 +201,11 @@ public:
             }
 
             // --------------------------------
-            // calcular claves
+            // Key calcutation
             // --------------------------------
             for (size_t i = 0; i < count; ++i)
             {
-                // Obtener índice global del punto (i) en la hoja (linear: directo -- ptr: a través de leafPoints)
+                // We need to obtain the global index of all points to access their coordinates
                 
                 size_t idx = begin + i;
                 if constexpr (requires { octree.getLeafPoints(leaf); }) {
@@ -217,14 +222,15 @@ public:
                     dz = points[idx].getZ() - center.getZ();
                 }
 
-                // Ángulo phi en XY (0 a 2pi)
+                // angle in XY plane [0, 2pi)
                 if (mode == ReorderMode::Polar)
                 {
                     const double phi = detail::normalizeAngle0To2Pi(std::atan2(dy, dx));
                     const double rxy = std::sqrt(dx * dx + dy * dy);
                     leafKeys[leaf].keys[0][i] = phi;
                 }
-                else if (mode == ReorderMode::Cartesian) // Coordenadas cartesianas: orden por X, Y, Z
+                // Cartesian mode: X, Y and Z axis
+                else if (mode == ReorderMode::Cartesian) 
                 {
                     leafKeys[leaf].keys[0][i] = dx;
                     leafKeys[leaf].keys[1][i] = dy;
@@ -233,7 +239,7 @@ public:
             }
 
             // --------------------------------
-            // ordenar permutaciones por claves KO, K1 y K2
+            // order permutations by keys
             // --------------------------------
             std::vector<double> sortedK(count);
             for (int k = 0; k < nVectors; ++k)
@@ -246,7 +252,6 @@ public:
                     [&](size_t a, size_t b) {
                         return leafKeys[leaf].keys[k][a] < leafKeys[leaf].keys[k][b];
                 });
-                // Reordenar el vector de claves con el orden de perms
                 
                 for (size_t i = 0; i < count; ++i)
                     sortedK[i] = leafKeys[leaf].keys[k][perm[i]];
@@ -257,7 +262,7 @@ public:
     }
 
     // ==========================
-    // acceso a keys
+    // access to keys
     // ==========================
     const std::vector<double>& getLeafKeys(size_t leaf, OrderType type) const {
          return leafKeys[leaf].keys[static_cast<int>(type)];
