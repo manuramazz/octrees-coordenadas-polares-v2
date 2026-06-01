@@ -8,14 +8,15 @@ datasets_low_density=(
     "data/paris_lille/Lille_0.las"
     "data/dales_las/5145_54340.las"
     "data/paris_lille/Paris_Luxembourg_6.las"
+    "data/pnoa/PNOA_2024_PNR_489-4672_NPC01.las"
 )
 datasets_high_density=(
     "data/semantic3d/bildstein_station1_xyz_intensity_rgb.las" 
     "data/semantic3d/sg27_station8_intensity_rgb.las"
 )
 
-MAX_POINTS_LEAF=(64, 128, 256, 512, 768, 1024)
-UMBRALES_PODA=(32, 64, 128)
+MAX_POINTS_LEAF=(128, 256, 512, 768, 1024)
+UMBRALES_PODA=(16, 64, 100)
 N_SEARCHES="10000"
 FULL_OURS="neighborsPrune"
 FULL_ALGOS_RADIUS="neighborsPrune"

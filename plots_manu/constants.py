@@ -11,6 +11,8 @@ NEIGHBOURS_UNIBN = "neighboursUnibn"
 NEIGHBOURS_NANOFLANN = "neighboursNanoflann"
 NEIGHBOURS_PICO = "neighboursPico"
 
+ALL_REORDER_MODES = ["none", "polar", "cartesian"]
+
 LINEAR_OCTREE = "linOct"
 POINTER_OCTREE = "ptrOct"
 UNIBN_OCTREE = "uniOct"

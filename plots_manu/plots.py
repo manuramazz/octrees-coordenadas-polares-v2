@@ -924,7 +924,7 @@ def plot_threshold_heatmap_comparison(data_path, cloud, reorder_mode, allFiles=T
             sns.heatmap(
                 pivot, 
                 annot=True, 
-                fmt=".2f",          # Dos decimales para los tiempos medios (puedes poner .0f si son enteros)
+                fmt=".3f",          # Dos decimales para los tiempos medios (puedes poner .0f si son enteros)
                 cmap="coolwarm_r", 
                 ax=ax, 
                 vmin=vmin, 
@@ -956,6 +956,117 @@ def plot_threshold_heatmap_comparison(data_path, cloud, reorder_mode, allFiles=T
         figs.append(fig)
         
     return figs
+
+def plot_octree_parallelization_heatmap(data_path, cloud, mode_filter="all", allFiles=True, annotated=True, fsz=(7, 3.5)):
+    """
+    Genera mapas térmicos de eficiencia de paralelización OpenMP para uno o varios modos.
+    Promedia los impactos de hiperparámetros (maxPointsLeaf, umbralPoda, kernel) para aislar la relación Radio vs Threads.
+    
+    Retorna:
+        list: Una lista con los objetos 'fig' de matplotlib generados para cada modo.
+    """
+    # 1. Consolidar DataFrames
+    if allFiles:
+        dfs_list = get_dataset_files_in_dir(data_path, cloud)
+    else:
+        single_df = get_dataset_file(data_path, cloud)
+        dfs_list = [single_df] if single_df is not None else []
+
+    dfs_list = [d for d in dfs_list if d is not None and not d.empty]
+    if not dfs_list:
+        print(f"Advertencia: No se encontraron datos válidos para la nube {cloud}.")
+        return []
+
+    df_master = pd.concat(dfs_list, ignore_index=True)
+
+
+    if mode_filter == "all":
+        modes_to_process = ALL_REORDER_MODES
+    elif isinstance(mode_filter, str):
+        # Si es un único string, lo envolvemos en un array para poder iterarlo
+        modes_to_process = [mode_filter]
+    else:
+        # Si ya es una lista o array, lo usamos directamente
+        modes_to_process = mode_filter
+    
+    # Lista donde iremos insertando cada figura generada en el bucle
+    figs = []
+    
+    # Diccionario de títulos adaptado al idioma del TFG
+    titulos_modos = {
+        'none': 'Eficiencia OpenMP - Modo Secuencial Base (Sen Poda)',
+        'polar': 'Eficiencia OpenMP - Algoritmo de Selección Polar',
+        'cartesian': 'Eficiencia OpenMP - Algoritmo de selección Cartesiano'
+    }
+
+    # 3. Bucle principal sobre cada modo solicitado
+    for mode_key in modes_to_process:
+        # Filtrar por dataset y el modo algorítmico actual de la iteración
+        df = df_master[(df_master["reorder"] == mode_key)]
+        
+        # Si no hay datos para este modo concreto, saltamos a la siguiente iteración
+        if df.empty:
+            print(f"Aviso: Non se atoparon datos para o modo '{mode_key}'")
+            continue
+            
+        # Asegurar columnas necesarias
+        df = df[["radius", "openmp_threads", "mean"]]
+        
+        # PROMEDIO DE CONFIGURACIONES INTERNAS (kernel, maxPointsLeaf...)
+        df_grouped = df.groupby(["radius", "openmp_threads"])["mean"].mean().reset_index()
+        
+        # EXTRACCIÓN DE LÍNEA BASE (1 Thread) para este modo específico
+        baseline = df_grouped[df_grouped["openmp_threads"] == 1].set_index("radius")["mean"]
+        
+        # Combinar con los datos agrupados
+        df_efficiency = df_grouped.merge(baseline.rename("T1"), on="radius")
+        
+        # CÁLCULO DE EFICIENCIA: E = T1 / (T_N * N)
+        df_efficiency["efficiency"] = df_efficiency["T1"] / (df_efficiency["openmp_threads"] * df_efficiency["mean"])
+        
+        # CREACIÓN DE MATRIZ: Eje Y -> radius, Eje X -> openmp_threads
+        efficiency_matrix = df_efficiency.pivot(index="radius", columns="openmp_threads", values="efficiency")
+        efficiency_matrix = efficiency_matrix.sort_index(ascending=True)
+        
+        # RENDERIZADO DE LA FIGURA ACTUAL
+        fig, ax = plt.subplots(figsize=fsz)
+        
+        heatmap = sns.heatmap(efficiency_matrix, 
+                              cmap="viridis", 
+                              annot=annotated, 
+                              fmt=".2f", 
+                              linewidths=0.5, 
+                              vmin=0, 
+                              vmax=1, 
+                              cbar_kws={'label': 'Eficiencia ($E$)'},
+                              annot_kws={"size": 10},
+                              ax=ax)    
+        
+        # Estética del Colorbar
+        cbar = heatmap.collections[0].colorbar
+        cbar.ax.yaxis.label.set_size(12)
+        cbar.ax.tick_params(axis="y", which="both", length=0)
+        
+        # Ejes y textos
+        ax.set_xlabel("Número de fíos (Threads)", fontsize=12, labelpad=10)
+        ax.set_ylabel("Radio de procura ($r$)", fontsize=12, labelpad=10)
+        ax.set_xticklabels(ax.get_xticklabels(), fontsize=11)
+        ax.set_yticklabels(ax.get_yticklabels(), fontsize=11, rotation=0)
+        
+        # Título dinámico
+        titulo = titulos_modos.get(mode_key, f"Eficiencia OpenMP - Modo: {mode_key}")
+        ax.set_title(titulo, fontsize=12, pad=15)
+        
+        ax.tick_params(axis="both", which="both", length=0)
+        plt.tight_layout()
+        plt.show()
+        # Guardamos la figura actual en nuestra lista antes de pasar a la siguiente
+        figs.append(fig)
+        
+    return figs
+
+
+
 
 ##########################################################
 ######### GRAFICAS DE VIS. PODAS EN ESPACIOS 3D ##########
