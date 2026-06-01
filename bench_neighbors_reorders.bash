@@ -3,6 +3,7 @@ FOLDER="out_tfg_reorders"
 set -e
 mkdir -p "$FOLDER"
 
+
 # datasets
 datasets_low_density=(
     "data/paris_lille/Lille_0.las"
