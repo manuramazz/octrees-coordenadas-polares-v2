@@ -4,8 +4,8 @@
 #SBATCH -p compute           # Partición (cola) de computación general
 #SBATCH -n 1                 # Un solo "task" (tu script de bash)
 #SBATCH -c 40                # Reservar 40 núcleos (coincide con tu THREADS máximo)
-#SBATCH --mem=50G            # Memoria RAM (ajusta según el peso de Semantic3D)
-#SBATCH -t 12:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
+#SBATCH --mem=20G            # Memoria RAM (ajusta según el peso de Semantic3D)
+#SBATCH -t 01:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
 #SBATCH -J octree_bench_v6     # Nombre del trabajo
 #SBATCH -o logs/bench_%j.out # Archivo de salida (crea la carpeta logs antes)
 #SBATCH -e logs/bench_%j.err # Archivo de errores

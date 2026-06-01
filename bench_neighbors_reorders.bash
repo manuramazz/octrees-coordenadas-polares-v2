@@ -1,5 +1,5 @@
 # setup
-FOLDER="resultsv6"
+FOLDER="resultsv8"
 set -e
 mkdir -p "$FOLDER"
 

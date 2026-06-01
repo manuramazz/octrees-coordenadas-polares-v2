@@ -1224,26 +1224,24 @@ public:
             }
 
             const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-            if (leafIndex >= 0) {
-                // Evaluamos el mejor rango entre X, Y y Z
-                const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
+            // Evaluamos el mejor rango entre X, Y y Z
+            const auto range = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius, count, precomputedRadii[currDepth]);
 
-                if (range.count() < count) {
-                    // Selección del puntero crudo del eje óptimo en O(1)
-                    const Point* axisData = nullptr;
-                    if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
-                    else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
-                    else                                   axisData = this->cartesianPointsZ;
+            if (range.count() < count) {
+                // Selección del puntero crudo del eje óptimo en O(1)
+                const Point* axisData = nullptr;
+                if (range.order == OrderType::K0)      axisData = this->cartesianPointsX;
+                else if (range.order == OrderType::K1) axisData = this->cartesianPointsY;
+                else                                   axisData = this->cartesianPointsZ;
 
-                    // Bucle de escaneo lineal sobre el eje óptimo podado
-                    for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
-                        const Point& p = axisData[i];
-                        if (k.isInside(p)) {
-                            ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
-                        }
+                // Bucle de escaneo lineal sobre el eje óptimo podado
+                for (size_t i = range.iMin + startIndex; i < range.iMax + startIndex; ++i) {
+                    const Point& p = axisData[i];
+                    if (k.isInside(p)) {
+                        ptsInside.push_back(p.id()); // Guardamos el ID original precalculado en el objeto Point
                     }
-                    return;
                 }
+                return;
             }
 
             // Fallback de rescate si ningún eje cartesiano podó la hoja (recorremos el vector base del Octree)

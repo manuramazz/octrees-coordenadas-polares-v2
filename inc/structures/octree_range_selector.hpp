@@ -131,6 +131,170 @@ inline PrunedRange bestRangeCartesian(
     for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
         double qCoord = 0.0;
         double hRadius = 0.0;
+
+        if (order == OrderType::K0) {
+            qCoord = query.getX() - center.getX();
+            hRadius = leafRadii.getX();
+        } else if (order == OrderType::K1) {
+            qCoord = query.getY() - center.getY();
+            hRadius = leafRadii.getY();
+        } else {
+            qCoord = query.getZ() - center.getZ();
+            hRadius = leafRadii.getZ();
+        }
+
+        if ((qCoord - radius < -hRadius - eps) && (qCoord + radius > hRadius + eps)) {
+            continue;
+        }
+
+
+        const auto& keys = reordered.getLeafKeys(leaf, order);
+        if (keys.empty()) {
+            continue;
+        }
+
+        const double firstKey = keys.front();
+        const double lastKey  = keys.back();
+
+        const double kMin = qCoord - radius;
+        const double kMax = qCoord + radius;
+
+        size_t iMin = 0;
+        if (kMin > firstKey) {
+            // iMin = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMin) - keys.begin());
+            iMin = branchless_lower_bound (keys, kMin);
+        }
+
+        size_t iMax = count;
+        if (kMax < lastKey) {
+            // iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMax) - keys.begin());
+            iMax = branchless_upper_bound (keys, kMax);
+        }
+
+        // 5. EVALUACIÓN DEL MEJOR RANGO
+        PrunedRange r{iMin, iMax, 0, 0, false, order};
+        const size_t rangeCount = r.count();
+
+        if (rangeCount < best.count()) {
+            best = r;
+            // Early exit si la poda es lo suficientemente agresiva
+            if ((static_cast<double>(rangeCount) / count) <= UMBRAL_PCT_PODA) {
+                return best;
+            }
+        }
+    }
+
+    return best;
+}
+
+// ###########################################################################################
+// ############################ MODO POLAR ##################################
+// ###########################################################################################
+template<typename Octree_t, typename Reordered_t>
+inline PrunedRange bestRangePolar(
+    size_t leaf,
+    const Point& query,
+    double radius,
+    Kernel_t kernel,
+    size_t count,
+    const Octree_t& octree,
+    const Reordered_t& reordered)
+{
+    PrunedRange full{0, count, 0, 0, false, OrderType::K0};
+    constexpr double eps = 1e-9;
+
+    const Point& center = octree.getLeafCenter(leaf);
+    
+    double dx = 0.0;
+    double dy = 0.0;
+    double dxy = 0.0;
+    double rxyEff = 0.0;
+    double phiQ = 0.0;
+    double deltaPhi = 0.0;
+
+    dx = query.getX() - center.getX();
+    dy = query.getY() - center.getY();
+
+    dxy = std::sqrt(dx * dx + dy * dy);
+    if (dxy <= eps) return full;
+
+    rxyEff = detail::effectiveXYRadius(radius, kernel);
+    if (dxy < rxyEff) return full;
+
+    phiQ = detail::normalizeAngle0To2Pi(std::atan2(dy, dx));
+    deltaPhi = std::asin(std::clamp(rxyEff / dxy, 0.0, 1.0));
+    if (deltaPhi >= detail::kPi) return full;
+
+    const double kMinRaw = phiQ - deltaPhi;
+    const double kMaxRaw = phiQ + deltaPhi;
+
+    if (kMinRaw < 0.0 || kMaxRaw >= detail::kTwoPi) {
+        return full;
+    }
+
+    const auto& keys = reordered.getLeafKeys(leaf, OrderType::K0);
+    if (keys.empty()) {
+        return full;
+    }
+
+    // if (kMinRaw < 0.0) {
+    //     size_t iMax1 = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
+    //     size_t iMin2 = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw + detail::kTwoPi) - keys.begin());
+    //     if (mainOptions.debugLeavesTime) {
+    //         accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
+    //     }
+    //     return {0, iMax1, iMin2, count, true, OrderType::K0};
+    // }
+    
+    // if (kMaxRaw >= detail::kTwoPi) {
+    //     size_t iMax1 = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw - detail::kTwoPi) - keys.begin());
+    //     size_t iMin2 = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw) - keys.begin());
+    //     if (mainOptions.debugLeavesTime) {
+    //         accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
+    //     }
+    //     return {0, iMax1, iMin2, count, true, OrderType::K0};
+    // }
+
+    // size_t iMin = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw) - keys.begin());
+    // size_t iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
+    size_t iMin = branchless_lower_bound (keys, kMinRaw);
+    size_t iMax = branchless_upper_bound (keys, kMaxRaw);
+    
+    return {iMin, iMax, 0, 0, false, OrderType::K0};
+}
+
+
+
+
+
+
+
+
+
+
+
+
+// ###########################################################################################
+// ########################## MODOS DEBUG  ###############################
+// ###########################################################################################
+template<typename Octree_t, typename Reordered_t>
+inline PrunedRange bestRangeCartesianDebug(
+    size_t leaf,
+    const Point& query,
+    double radius,
+    Kernel_t kernel,
+    size_t count,
+    const Octree_t& octree,
+    const Reordered_t& reordered,
+    const Vector& leafRadii)
+{
+    const Point& center = octree.getLeafCenter(leaf);
+    PrunedRange best{0, count, 0, 0, false, OrderType::K0};
+    const double eps = 1e-9;
+    // Evaluamos los 3 ejes de forma directa
+    for (OrderType order : {OrderType::K0, OrderType::K1, OrderType::K2}) {
+        double qCoord = 0.0;
+        double hRadius = 0.0;
         if (mainOptions.debugLeavesTime) {
             const auto projectionStart = std::chrono::steady_clock::now();
             if (order == OrderType::K0) {
@@ -217,7 +381,7 @@ inline PrunedRange bestRangeCartesian(
 // ############################ MODO POLAR ##################################
 // ###########################################################################################
 template<typename Octree_t, typename Reordered_t>
-inline PrunedRange bestRangePolar(
+inline PrunedRange bestRangePolarDebug(
     size_t leaf,
     const Point& query,
     double radius,
