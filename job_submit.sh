@@ -5,8 +5,8 @@
 #SBATCH -n 1                 # Un solo "task" (tu script de bash)
 #SBATCH -c 40                # Reservar 40 núcleos (coincide con tu THREADS máximo)
 #SBATCH --mem=20G            # Memoria RAM (ajusta según el peso de Semantic3D)
-#SBATCH -t 07:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
-#SBATCH -J out_tfg_reorders     # Nombre del trabajo
+#SBATCH -t 05:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
+#SBATCH -J out_tfg_reorders_v2    # Nombre del trabajo
 #SBATCH -o logs/bench_%j.out # Archivo de salida (crea la carpeta logs antes)
 #SBATCH -e logs/bench_%j.err # Archivo de errores
 #SBATCH --mail-type=END,FAIL # Notificar al finalizar o si falla

@@ -1159,15 +1159,14 @@ public:
                     ptsInside.push_back(i);
                 }
             }
-                    // Segundo intervalo podado (Wrap-around angular)
-                    // if (range.hasSecond) {
-                    //     for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
-                    //         if (k.isInside(this->polarPoints[i])) {
-                    //             ptsInside.push_back(i);
-                    //         }
-                    //     }
-                    // }
-                    // return;
+            if (range.hasSecond) {
+                for (size_t i = range.iMin2  + startIndex; i < range.iMax2  + startIndex; ++i) {
+                    if (k.isInside(this->polarPoints[i])) {
+                        ptsInside.push_back(i);
+                    }
+                }
+            }
+            return;
             
 
             // // Fallback si la búsqueda binaria no pudo podar nada: recorremos secuencialmente polarData

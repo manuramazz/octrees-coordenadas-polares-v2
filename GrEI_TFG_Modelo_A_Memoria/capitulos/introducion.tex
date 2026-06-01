@@ -1,4 +1,9 @@
-\chapter{Introdución}
+\chapter{Introducción}
 \hyphenation{In-te-re-se}
 
-Descrición do problema a resolver, Hipótese(s) a testar, Obxectivo xeral do traballo, Obxectivos concretos, contrastables e descritos correctamente.
+Las nubes de puntos 3D son una representación de una realidad, como un objeto o un terreno, mediante un conjunto de puntos en el espacio tridimensional, estando cada punto caracterizado por sus coordenadas X, Y y Z así como otras propiedades como el color o la intensidad. Entre las aplicaciones más importantes de la elaboración de estas nubes están la cartología, la evelaboración de modelos tridimensionales en CAD de piezas fabricadas, la metrología, la arqueología o la conducción autónoma.
+La tecnología predominante para la captura de estos puntos es la LiDAR (Light Detection And Ranging).
+
+Una de las tareas más comunes al trabajar sobre nubes de puntos 3D es la búsqueda de vecindades alrededor de un punto dado. Uno de los problemas a nivel de hardware de estos datos es que se almacenan en el orden en el que son obtenidos por el escáner LiDAR, pero no tienen ningún tipo de estructura ni orden basado en localidad. Este fenómeno se junta con el hecho de que estas nubes pueden tener millones de puntos almacenados. Por eso, se necesitan métodos eficientes para acelerar este lento proceso.
+
+Los \textit{Octrees} y los \textit{KDTrees} son estructuras jerárquicas ampliamente utilizadas para llevar a cabo esta tarea. Consisten en dividir la nube de puntos recursivamente en zonas próximas en memoria. Los \textit{Octrees} son estructuras donde cada nodo se divide exactamente 8 hijos, dividiendo cada dimensión a la mitad (solo se usa en espacios tridimensionales). Los puntos pertenecen al nodo hoja que los contiene en su interior. Por otra parte, los \textit{KDTrees} son árboles binarios que dividen cada nodo interno solamente según una dimensión, por lo que funcionan para cualquier número de dimensiones.

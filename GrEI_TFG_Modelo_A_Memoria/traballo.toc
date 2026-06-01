@@ -1,5 +1,5 @@
 \babel@toc {spanish}{}\relax 
-\contentsline {chapter}{\numberline {1}Introdución}{1}{}%
+\contentsline {chapter}{\numberline {1}Introducción}{1}{}%
 \contentsline {chapter}{\numberline {2}Estado de coñecemento do problema a abordar}{3}{}%
 \contentsline {chapter}{\numberline {3}Metodoloxía}{5}{}%
 \contentsline {chapter}{\numberline {4}Probas}{7}{}%

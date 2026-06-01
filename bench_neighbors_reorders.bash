@@ -1,5 +1,5 @@
 # setup
-FOLDER="out_tfg_reorders"
+FOLDER="out_tfg_reorders_v2"
 set -e
 mkdir -p "$FOLDER"
 

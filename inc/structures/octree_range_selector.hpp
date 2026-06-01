@@ -251,32 +251,23 @@ inline PrunedRange bestRangePolar(
     const double kMinRaw = phiQ - deltaPhi;
     const double kMaxRaw = phiQ + deltaPhi;
 
-    if (kMinRaw < 0.0 || kMaxRaw >= detail::kTwoPi) {
-        return full;
-    }
-
     const auto& keys = reordered.getLeafKeys(leaf, OrderType::K0);
     if (keys.empty()) {
         return full;
     }
 
-    // if (kMinRaw < 0.0) {
-    //     size_t iMax1 = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
-    //     size_t iMin2 = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw + detail::kTwoPi) - keys.begin());
-    //     if (mainOptions.debugLeavesTime) {
-    //         accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
-    //     }
-    //     return {0, iMax1, iMin2, count, true, OrderType::K0};
-    // }
+    if (kMinRaw < 0.0) {
+        size_t iMax1 = branchless_upper_bound(keys, kMaxRaw);
+        size_t iMin2 = branchless_lower_bound(keys, kMinRaw + detail::kTwoPi);
+        return {0, iMax1, iMin2, count, true, OrderType::K0};
+    }
     
-    // if (kMaxRaw >= detail::kTwoPi) {
-    //     size_t iMax1 = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw - detail::kTwoPi) - keys.begin());
-    //     size_t iMin2 = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw) - keys.begin());
-    //     if (mainOptions.debugLeavesTime) {
-    //         accumulatedBinarySearchTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - binaryStart).count();
-    //     }
-    //     return {0, iMax1, iMin2, count, true, OrderType::K0};
-    // }
+    if (kMaxRaw >= detail::kTwoPi) {
+        size_t iMax1 = branchless_upper_bound(keys, kMaxRaw - detail::kTwoPi);
+        size_t iMin2 = branchless_lower_bound(keys, kMinRaw);
+
+        return {0, iMax1, iMin2, count, true, OrderType::K0};
+    }
 
     // size_t iMin = static_cast<size_t>(std::lower_bound(keys.begin(), keys.end(), kMinRaw) - keys.begin());
     // size_t iMax = static_cast<size_t>(std::upper_bound(keys.begin(), keys.end(), kMaxRaw) - keys.begin());
