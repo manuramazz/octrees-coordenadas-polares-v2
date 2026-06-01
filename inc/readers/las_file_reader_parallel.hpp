@@ -58,7 +58,7 @@ class LasFileReaderParallel : public FileReader<Container>
 		pci.yOffset = lasreader->header.y_offset;
 		pci.zOffset = lasreader->header.z_offset;
 
-  		pci.totalPoints = lasreader->header.number_of_point_records;
+  		pci.totalPoints = lasreader->npoints;
 		return pci;
 	};
 
