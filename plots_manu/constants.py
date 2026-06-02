@@ -12,6 +12,7 @@ NEIGHBOURS_NANOFLANN = "neighboursNanoflann"
 NEIGHBOURS_PICO = "neighboursPico"
 
 ALL_REORDER_MODES = ["none", "polar", "cartesian"]
+ALL_CLOUDS = ["bildstein_station1_xyz_intensity_rgb", "sg27_station8_intensity_rgb", "5145_54340", "Lille_0", "Paris_Luxembourg_6", "PNOA_2024_PNR_489-4672_NPC01"]
 
 LINEAR_OCTREE = "linOct"
 POINTER_OCTREE = "ptrOct"

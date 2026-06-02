@@ -838,7 +838,7 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
         
     return figs
 
-def plot_threshold_heatmap_comparison(data_path, cloud, reorder_mode, allFiles=True, kernel="all", radius="all"):
+def plot_threshold_heatmap_comparison(data_path, cloud, reorder_mode="all", allFiles=True, kernel="all", radius="all"):
     """
     Genera figuras independientes por cada valor de radio. Cada figura contiene subplots
     en forma de mapas de calor para encontrar la combinación óptima de 'threshold' y 'maxPointsLeaf'.
@@ -924,7 +924,7 @@ def plot_threshold_heatmap_comparison(data_path, cloud, reorder_mode, allFiles=T
             sns.heatmap(
                 pivot, 
                 annot=True, 
-                fmt=".3f",          # Dos decimales para los tiempos medios (puedes poner .0f si son enteros)
+                fmt=".4f",          # Dos decimales para los tiempos medios (puedes poner .0f si son enteros)
                 cmap="coolwarm_r", 
                 ax=ax, 
                 vmin=vmin, 
