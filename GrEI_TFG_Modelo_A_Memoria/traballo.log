@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.6.1)  1 JUN 2026 20:43
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.6.1)  3 JUN 2026 09:56
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -125,7 +125,11 @@ File: l3backend-pdftex.def 2024-01-04 L3 backend support: PDF output (pdfTeX)
 ) (./traballo.aux (./capitulos/titulo.aux)
 LaTeX Info: Redefining \. on input line 9.
 LaTeX Info: Redefining \% on input line 9.
- (./capitulos/certificacion.aux) (./capitulos/agradecementos.aux) (./capitulos/resumo.aux) (./capitulos/introducion.aux) (./capitulos/cap2.aux) (./capitulos/cap3.aux) (./capitulos/cap4.aux) (./capitulos/cap5.aux) (./capitulos/exemplos.aux) (./capitulos/conclusions.aux) (./capitulos/apendicea.aux) (./capitulos/apendiceb.aux) (./capitulos/licenza.aux) (./capitulos/bibliografia.aux))
+ (./capitulos/certificacion.aux) (./capitulos/agradecementos.aux) (./capitulos/resumo.aux) (./capitulos/introducion.aux) (./capitulos/cap2.aux) (./capitulos/cap3.aux) (./capitulos/cap4.aux) (./capitulos/cap5.aux) (./capitulos/cap6.aux) (./capitulos/exemplos.aux
+
+LaTeX Warning: Label `enlace2' multiply defined.
+
+) (./capitulos/conclusions.aux) (./capitulos/apendicea.aux) (./capitulos/apendiceb.aux) (./capitulos/licenza.aux) (./capitulos/bibliografia.aux))
 \openout1 = `traballo.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 32.
@@ -281,13 +285,16 @@ LaTeX Info: Redefining \% on input line 1.
 
  (./capitulos/introducion.tex
 Cap\'{\i }tulo 1.
-) [1
+[1
 
 
 ]
+LaTeX Info: Redefining \. on input line 23.
+LaTeX Info: Redefining \% on input line 23.
+ [2]) [3]
 LaTeX Info: Redefining \. on input line 53.
 LaTeX Info: Redefining \% on input line 53.
- [2
+ [4
 
 
 
@@ -296,18 +303,26 @@ LaTeX Info: Redefining \% on input line 53.
 
  (./capitulos/cap2.tex
 Cap\'{\i }tulo 2.
-) [3
+[5
 
 
 ]
+LaTeX Info: Redefining \. on input line 20.
+LaTeX Info: Redefining \% on input line 20.
+
+Overfull \hbox (16.33667pt too wide) has occurred while \output is active
+\OT1/cmr/m/n/12 6 \OT1/cmr/m/sl/12 CAP[]ITULO 2.  ESTADO DE CONOCIMIENTO DEL PROBLEMA A ABORDAR
+ []
+
+[6]) [7]
 LaTeX Info: Redefining \. on input line 55.
 LaTeX Info: Redefining \% on input line 55.
 
-Overfull \hbox (8.51175pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/12 4 \OT1/cmr/m/sl/12 CAP[]ITULO 2.  ESTADO DE CO[]NECEMENTO DO PROBLEMA A ABORDAR
+Overfull \hbox (16.33667pt too wide) has occurred while \output is active
+\OT1/cmr/m/n/12 8 \OT1/cmr/m/sl/12 CAP[]ITULO 2.  ESTADO DE CONOCIMIENTO DEL PROBLEMA A ABORDAR
  []
 
-[4
+[8
 
 
 
@@ -316,13 +331,18 @@ Overfull \hbox (8.51175pt too wide) has occurred while \output is active
 
  (./capitulos/cap3.tex
 Cap\'{\i }tulo 3.
-) [5
+
+Overfull \hbox (112.66519pt too wide) in paragraph at lines 7--17
+ [] 
+ []
+
+) [9
 
 
 ]
 LaTeX Info: Redefining \. on input line 57.
 LaTeX Info: Redefining \% on input line 57.
- [6
+ [10
 
 
 
@@ -331,13 +351,13 @@ LaTeX Info: Redefining \% on input line 57.
 
  (./capitulos/cap4.tex
 Cap\'{\i }tulo 4.
-) [7
+) [11
 
 
 ]
 LaTeX Info: Redefining \. on input line 59.
 LaTeX Info: Redefining \% on input line 59.
- [8
+ [12
 
 
 
@@ -346,13 +366,28 @@ LaTeX Info: Redefining \% on input line 59.
 
  (./capitulos/cap5.tex
 Cap\'{\i }tulo 5.
-) [9
+) [13
 
 
 ]
 LaTeX Info: Redefining \. on input line 61.
 LaTeX Info: Redefining \% on input line 61.
- [10
+ [14
+
+
+
+]
+\openout2 = `capitulos/cap6.aux'.
+
+ (./capitulos/cap6.tex
+Cap\'{\i }tulo 6.
+) [15
+
+
+]
+LaTeX Info: Redefining \. on input line 63.
+LaTeX Info: Redefining \% on input line 63.
+ [16
 
 
 
@@ -360,8 +395,8 @@ LaTeX Info: Redefining \% on input line 61.
 \openout2 = `capitulos/exemplos.aux'.
 
  (./capitulos/exemplos.tex
-Cap\'{\i }tulo 6.
-[11
+Cap\'{\i }tulo 7.
+[17
 
 
 ]
@@ -374,7 +409,7 @@ Package epstopdf Info: Source file: <figuras/figura01.eps>
 (epstopdf)             Command: <repstopdf --outfile=figuras/figura01-eps-converted-to.pdf figuras/figura01.eps>
 (epstopdf)             \includegraphics on input line 30.
 Package epstopdf Info: Output file is already uptodate.
-<figuras/figura01-eps-converted-to.pdf, id=100, 1060.96375pt x 513.92pt>
+<figuras/figura01-eps-converted-to.pdf, id=119, 1060.96375pt x 513.92pt>
 File: figuras/figura01-eps-converted-to.pdf Graphic file (type pdf)
 <use figuras/figura01-eps-converted-to.pdf>
 Package pdftex.def Info: figuras/figura01-eps-converted-to.pdf  used on input line 30.
@@ -386,10 +421,10 @@ LaTeX Info: Redefining \. on input line 55.
 LaTeX Info: Redefining \% on input line 55.
 
 Overfull \hbox (1.62976pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/12 12 \OT1/cmr/m/sl/12 CAP[]ITULO 6.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
+\OT1/cmr/m/n/12 18 \OT1/cmr/m/sl/12 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
  []
 
-[12 <./figuras/figura01-eps-converted-to.pdf>] (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
+[18 <./figuras/figura01-eps-converted-to.pdf>] (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2023/02/27 1.9 listings language file
 ) (/usr/share/texlive/texmf-dist/tex/latex/listings/lstmisc.sty
 File: lstmisc.sty 2023/02/27 1.9 (Carsten Heinz)
@@ -414,17 +449,17 @@ Overfull \hbox (53.36043pt too wide) in paragraph at lines 97--98
  []
 
 )
-LaTeX Info: Redefining \. on input line 62.
-LaTeX Info: Redefining \% on input line 62.
- [13]
-LaTeX Info: Redefining \. on input line 66.
-LaTeX Info: Redefining \% on input line 66.
+LaTeX Info: Redefining \. on input line 64.
+LaTeX Info: Redefining \% on input line 64.
+ [19]
+LaTeX Info: Redefining \. on input line 68.
+LaTeX Info: Redefining \% on input line 68.
 
 Overfull \hbox (1.62976pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/12 14 \OT1/cmr/m/sl/12 CAP[]ITULO 6.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
+\OT1/cmr/m/n/12 20 \OT1/cmr/m/sl/12 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
  []
 
-[14
+[20
 
 
 
@@ -432,14 +467,14 @@ Overfull \hbox (1.62976pt too wide) has occurred while \output is active
 \openout2 = `capitulos/conclusions.aux'.
 
  (./capitulos/conclusions.tex
-Cap\'{\i }tulo 7.
-) [15
+Cap\'{\i }tulo 8.
+) [21
 
 
 ]
-LaTeX Info: Redefining \. on input line 71.
-LaTeX Info: Redefining \% on input line 71.
- [16
+LaTeX Info: Redefining \. on input line 73.
+LaTeX Info: Redefining \% on input line 73.
+ [22
 
 
 
@@ -448,13 +483,13 @@ LaTeX Info: Redefining \% on input line 71.
 
  (./capitulos/apendicea.tex
 Ap\'{e}ndice A.
-) [17
+) [23
 
 
 ]
-LaTeX Info: Redefining \. on input line 73.
-LaTeX Info: Redefining \% on input line 73.
- [18
+LaTeX Info: Redefining \. on input line 75.
+LaTeX Info: Redefining \% on input line 75.
+ [24
 
 
 
@@ -463,13 +498,13 @@ LaTeX Info: Redefining \% on input line 73.
 
  (./capitulos/apendiceb.tex
 Ap\'{e}ndice B.
-) [19
+) [25
 
 
 ]
-LaTeX Info: Redefining \. on input line 75.
-LaTeX Info: Redefining \% on input line 75.
- [20
+LaTeX Info: Redefining \. on input line 77.
+LaTeX Info: Redefining \% on input line 77.
+ [26
 
 
 
@@ -478,13 +513,13 @@ LaTeX Info: Redefining \% on input line 75.
 
  (./capitulos/licenza.tex
 Ap\'{e}ndice C.
-) [21
+) [27
 
 
 ]
-LaTeX Info: Redefining \. on input line 77.
-LaTeX Info: Redefining \% on input line 77.
- [22
+LaTeX Info: Redefining \. on input line 79.
+LaTeX Info: Redefining \% on input line 79.
+ [28
 
 
 
@@ -501,31 +536,35 @@ Underfull \hbox (badness 10000) in paragraph at lines 10--11
 []\OT1/cmr/m/n/12 Acceso m^^Sulti-ple por di-vi-si^^Son de c^^Sodi-go. Ar-ti-go da wi-ki-pe-dia
  []
 
-) [23
+) [29
 
 
 ] (./traballo.aux (./capitulos/titulo.aux)
 LaTeX Info: Redefining \. on input line 9.
 LaTeX Info: Redefining \% on input line 9.
- (./capitulos/certificacion.aux) (./capitulos/agradecementos.aux) (./capitulos/resumo.aux) (./capitulos/introducion.aux) (./capitulos/cap2.aux) (./capitulos/cap3.aux) (./capitulos/cap4.aux) (./capitulos/cap5.aux) (./capitulos/exemplos.aux) (./capitulos/conclusions.aux) (./capitulos/apendicea.aux) (./capitulos/apendiceb.aux) (./capitulos/licenza.aux) (./capitulos/bibliografia.aux))
+ (./capitulos/certificacion.aux) (./capitulos/agradecementos.aux) (./capitulos/resumo.aux) (./capitulos/introducion.aux) (./capitulos/cap2.aux) (./capitulos/cap3.aux) (./capitulos/cap4.aux) (./capitulos/cap5.aux) (./capitulos/cap6.aux) (./capitulos/exemplos.aux) (./capitulos/conclusions.aux) (./capitulos/apendicea.aux) (./capitulos/apendiceb.aux) (./capitulos/licenza.aux) (./capitulos/bibliografia.aux))
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-22>
  ***********
+
+
+LaTeX Warning: There were multiply-defined labels.
+
  ) 
 Here is how much of TeX's memory you used:
- 5855 strings out of 476120
- 95430 string characters out of 5793658
- 1939975 words of memory out of 5000000
- 27696 multiletter control sequences out of 15000+600000
+ 5880 strings out of 476120
+ 96152 string characters out of 5793658
+ 1940975 words of memory out of 5000000
+ 27714 multiletter control sequences out of 15000+600000
  568292 words of font info for 74 fonts, out of 8000000 for 9000
  41 hyphenation exceptions out of 8191
- 57i,8n,65p,774b,1319s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 57i,11n,65p,1341b,1319s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1200.600pk> </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcti1200.600pk></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsl12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt12.pfb>
-Output written on traballo.pdf (37 pages, 231760 bytes).
+Output written on traballo.pdf (43 pages, 250176 bytes).
 PDF statistics:
- 219 PDF objects out of 1000 (max. 8388607)
- 142 compressed objects within 2 object streams
+ 238 PDF objects out of 1000 (max. 8388607)
+ 155 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
  11 words of extra memory for PDF output out of 10000 (max. 10000000)
 

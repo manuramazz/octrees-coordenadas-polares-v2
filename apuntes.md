@@ -85,9 +85,19 @@ ESTRATEGIA REFACTORIZACIÓN CÓDIGO
     - Limpieza: implementar funciones diferentes para debug ranges y debug leafs: los ifs los hago en neighbors_benchmark: si hay un debug activado llamo a la función indicada, dentro ya no hay nada que comprobar.
 
 
-SITUACIÓN ACTUAL
-- Cambiar modo cartesiano -> solo una búsqueda binaria
-- Seguir mejorando gráficas (de tiempos totales)
+QUÉ HACER AHORA
+-
+- Descargar nubes de Miguel
+- Moverlas a Ubuntu para probarlas
+- Subirlas a drive
+- Descargarlas desde el CESGA
+- Hablarle a Miguel sobre el algoritmo y los octrees externos. Sexo
+- Probarlas
+- Seguir con materiales (incluir nubes nuevas).
+- Hablarle a Mónica.
+- Dependiendo de la respuesta: limpiar o integrar:
+- Mandar ejecuciones de reorders y parallel
+
 
 
 

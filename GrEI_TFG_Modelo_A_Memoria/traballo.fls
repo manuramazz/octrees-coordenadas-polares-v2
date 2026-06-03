@@ -92,6 +92,9 @@ INPUT capitulos/cap4.aux
 INPUT ./capitulos/cap5.aux
 INPUT ./capitulos/cap5.aux
 INPUT capitulos/cap5.aux
+INPUT ./capitulos/cap6.aux
+INPUT ./capitulos/cap6.aux
+INPUT capitulos/cap6.aux
 INPUT ./capitulos/exemplos.aux
 INPUT ./capitulos/exemplos.aux
 INPUT capitulos/exemplos.aux
@@ -229,6 +232,7 @@ OUTPUT capitulos/cap2.aux
 INPUT ./capitulos/cap2.tex
 INPUT ./capitulos/cap2.tex
 INPUT capitulos/cap2.tex
+INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmtt12.tfm
 INPUT ./capitulos/cap3.tex
 INPUT ./capitulos/cap3.tex
 OUTPUT capitulos/cap3.aux
@@ -247,6 +251,12 @@ OUTPUT capitulos/cap5.aux
 INPUT ./capitulos/cap5.tex
 INPUT ./capitulos/cap5.tex
 INPUT capitulos/cap5.tex
+INPUT ./capitulos/cap6.tex
+INPUT ./capitulos/cap6.tex
+OUTPUT capitulos/cap6.aux
+INPUT ./capitulos/cap6.tex
+INPUT ./capitulos/cap6.tex
+INPUT capitulos/cap6.tex
 INPUT ./capitulos/exemplos.tex
 INPUT ./capitulos/exemplos.tex
 OUTPUT capitulos/exemplos.aux
@@ -254,7 +264,6 @@ INPUT ./capitulos/exemplos.tex
 INPUT ./capitulos/exemplos.tex
 INPUT capitulos/exemplos.tex
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmr17.tfm
-INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmtt12.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmr10.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmr12.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmr17.tfm
@@ -344,6 +353,9 @@ INPUT capitulos/cap4.aux
 INPUT ./capitulos/cap5.aux
 INPUT ./capitulos/cap5.aux
 INPUT capitulos/cap5.aux
+INPUT ./capitulos/cap6.aux
+INPUT ./capitulos/cap6.aux
+INPUT capitulos/cap6.aux
 INPUT ./capitulos/exemplos.aux
 INPUT ./capitulos/exemplos.aux
 INPUT capitulos/exemplos.aux
