@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.6.1)  3 JUN 2026 09:56
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.6.1)  4 JUN 2026 00:56
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -118,56 +118,165 @@ File: lstmisc.sty 2023/02/27 1.9 (Carsten Heinz)
 File: listings.cfg 2023/02/27 1.9 listings configuration
 ))
 Package: listings 2023/02/27 1.9 (Carsten Heinz)
- (/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
+ (/usr/share/texlive/texmf-dist/tex/latex/tools/tabularx.sty
+Package: tabularx 2023/07/08 v2.11c `tabularx' package (DPC)
+ (/usr/share/texlive/texmf-dist/tex/latex/tools/array.sty
+Package: array 2023/10/16 v2.5g Tabular extension package (FMi)
+\col@sep=\dimen150
+\ar@mcellbox=\box56
+\extrarowheight=\dimen151
+\NC@list=\toks25
+\extratabsurround=\skip50
+\backup@length=\skip51
+\ar@cellbox=\box57
+)
+\TX@col@width=\dimen152
+\TX@old@table=\dimen153
+\TX@old@col=\dimen154
+\TX@target=\dimen155
+\TX@delta=\dimen156
+\TX@cols=\count274
+\TX@ftn=\toks26
+) (/usr/share/texlive/texmf-dist/tex/latex/multirow/multirow.sty
+Package: multirow 2021/03/15 v2.8 Span multiple rows of a table
+\multirow@colwidth=\skip52
+\multirow@cntb=\count275
+\multirow@dima=\skip53
+\bigstrutjot=\dimen157
+) (/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsmath.sty
+Package: amsmath 2023/05/13 v2.17o AMS math features
+\@mathmargin=\skip54
+
+For additional information on amsmath, use the `?' option.
+(/usr/share/texlive/texmf-dist/tex/latex/amsmath/amstext.sty
+Package: amstext 2021/08/26 v2.01 AMS text
+ (/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsgen.sty
+File: amsgen.sty 1999/11/30 v2.0 generic functions
+\@emptytoks=\toks27
+\ex@=\dimen158
+)) (/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsbsy.sty
+Package: amsbsy 1999/11/29 v1.2d Bold Symbols
+\pmbraise@=\dimen159
+) (/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsopn.sty
+Package: amsopn 2022/04/08 v2.04 operator names
+)
+\inf@bad=\count276
+LaTeX Info: Redefining \frac on input line 234.
+\uproot@=\count277
+\leftroot@=\count278
+LaTeX Info: Redefining \overline on input line 399.
+LaTeX Info: Redefining \colon on input line 410.
+\classnum@=\count279
+\DOTSCASE@=\count280
+LaTeX Info: Redefining \ldots on input line 496.
+LaTeX Info: Redefining \dots on input line 499.
+LaTeX Info: Redefining \cdots on input line 620.
+\Mathstrutbox@=\box58
+\strutbox@=\box59
+LaTeX Info: Redefining \big on input line 722.
+LaTeX Info: Redefining \Big on input line 723.
+LaTeX Info: Redefining \bigg on input line 724.
+LaTeX Info: Redefining \Bigg on input line 725.
+\big@size=\dimen160
+LaTeX Font Info:    Redeclaring font encoding OML on input line 743.
+LaTeX Font Info:    Redeclaring font encoding OMS on input line 744.
+\macc@depth=\count281
+LaTeX Info: Redefining \bmod on input line 905.
+LaTeX Info: Redefining \pmod on input line 910.
+LaTeX Info: Redefining \smash on input line 940.
+LaTeX Info: Redefining \relbar on input line 970.
+LaTeX Info: Redefining \Relbar on input line 971.
+\c@MaxMatrixCols=\count282
+\dotsspace@=\muskip16
+\c@parentequation=\count283
+\dspbrk@lvl=\count284
+\tag@help=\toks28
+\row@=\count285
+\column@=\count286
+\maxfields@=\count287
+\andhelp@=\toks29
+\eqnshift@=\dimen161
+\alignsep@=\dimen162
+\tagshift@=\dimen163
+\tagwidth@=\dimen164
+\totwidth@=\dimen165
+\lineht@=\dimen166
+\@envbody=\toks30
+\multlinegap=\skip55
+\multlinetaggap=\skip56
+\mathdisplay@stack=\toks31
+LaTeX Info: Redefining \[ on input line 2953.
+LaTeX Info: Redefining \] on input line 2954.
+) (/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
 File: l3backend-pdftex.def 2024-01-04 L3 backend support: PDF output (pdfTeX)
-\l__color_backend_stack_int=\count274
-\l__pdf_internal_box=\box56
+\l__color_backend_stack_int=\count288
+\l__pdf_internal_box=\box60
 ) (./traballo.aux (./capitulos/titulo.aux)
 LaTeX Info: Redefining \. on input line 9.
 LaTeX Info: Redefining \% on input line 9.
- (./capitulos/certificacion.aux) (./capitulos/agradecementos.aux) (./capitulos/resumo.aux) (./capitulos/introducion.aux) (./capitulos/cap2.aux) (./capitulos/cap3.aux) (./capitulos/cap4.aux) (./capitulos/cap5.aux) (./capitulos/cap6.aux) (./capitulos/exemplos.aux
-
-LaTeX Warning: Label `enlace2' multiply defined.
-
-) (./capitulos/conclusions.aux) (./capitulos/apendicea.aux) (./capitulos/apendiceb.aux) (./capitulos/licenza.aux) (./capitulos/bibliografia.aux))
+ (./capitulos/certificacion.aux) (./capitulos/agradecementos.aux) (./capitulos/resumo.aux) (./capitulos/introducion.aux) (./capitulos/cap2.aux) (./capitulos/cap3.aux) (./capitulos/cap4.aux) (./capitulos/cap5.aux) (./capitulos/cap6.aux) (./capitulos/exemplos.aux) (./capitulos/conclusions.aux) (./capitulos/apendicea.aux) (./capitulos/apendiceb.aux) (./capitulos/licenza.aux) (./capitulos/bibliografia.aux))
 \openout1 = `traballo.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 32.
-LaTeX Font Info:    ... okay on input line 32.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 32.
-LaTeX Font Info:    ... okay on input line 32.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 32.
-LaTeX Font Info:    ... okay on input line 32.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 32.
-LaTeX Font Info:    ... okay on input line 32.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 32.
-LaTeX Font Info:    ... okay on input line 32.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 32.
-LaTeX Font Info:    ... okay on input line 32.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 32.
-LaTeX Font Info:    ... okay on input line 32.
-LaTeX Info: Redefining \. on input line 32.
-LaTeX Info: Redefining \% on input line 32.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Info: Redefining \. on input line 35.
+LaTeX Info: Redefining \% on input line 35.
  (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count275
-\scratchdimen=\dimen150
-\scratchbox=\box57
-\nofMPsegments=\count276
-\nofMParguments=\count277
-\everyMPshowfont=\toks25
-\MPscratchCnt=\count278
-\MPscratchDim=\dimen151
-\MPnumerator=\count279
-\makeMPintoPDFobject=\count280
-\everyMPtoPDFconversion=\toks26
+\scratchcounter=\count289
+\scratchdimen=\dimen167
+\scratchbox=\box61
+\nofMPsegments=\count290
+\nofMParguments=\count291
+\everyMPshowfont=\toks32
+\MPscratchCnt=\count292
+\MPscratchDim=\dimen168
+\MPnumerator=\count293
+\makeMPintoPDFobject=\count294
+\everyMPtoPDFconversion=\toks33
 ) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
+ (/usr/share/texlive/texmf-dist/tex/generic/infwarerr/infwarerr.sty
+Package: infwarerr 2019/12/03 v1.5 Providing info/warning/error messages (HO)
+) (/usr/share/texlive/texmf-dist/tex/latex/grfext/grfext.sty
+Package: grfext 2019/12/03 v1.3 Manage graphics extensions (HO)
+ (/usr/share/texlive/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty
+Package: kvdefinekeys 2019-12-19 v1.6 Define keys (HO)
+)) (/usr/share/texlive/texmf-dist/tex/latex/kvoptions/kvoptions.sty
+Package: kvoptions 2022-06-15 v3.15 Key value format for package options (HO)
+ (/usr/share/texlive/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty
+Package: ltxcmds 2023-12-04 v1.26 LaTeX kernel commands for general use (HO)
+) (/usr/share/texlive/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty
+Package: kvsetkeys 2022-10-05 v1.19 Key value parser (HO)
+)) (/usr/share/texlive/texmf-dist/tex/generic/pdftexcmds/pdftexcmds.sty
+Package: pdftexcmds 2020-06-27 v0.33 Utility functions of pdfTeX for LuaTeX (HO)
+ (/usr/share/texlive/texmf-dist/tex/generic/iftex/iftex.sty
+Package: iftex 2022/02/03 v1.0f TeX engine tests
+)
+Package pdftexcmds Info: \pdf@primitive is available.
+Package pdftexcmds Info: \pdf@ifprimitive is available.
+Package pdftexcmds Info: \pdfdraftmode found.
+)
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
+Package grfext Info: Graphics extension search list:
+(grfext)             [.pdf,.png,.jpg,.mps,.jpeg,.jbig2,.jb2,.PDF,.PNG,.JPG,.JPEG,.JBIG2,.JB2,.eps]
+(grfext)             \AppendGraphicsExtensions on input line 504.
  (/usr/share/texlive/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 ))
-\c@lstlisting=\count281
+\c@lstlisting=\count295
 \openout2 = `capitulos/titulo.aux'.
 
  (./capitulos/titulo.tex
@@ -221,7 +330,7 @@ File: figuras/logo_usc-eps-converted-to.pdf Graphic file (type pdf)
 Package pdftex.def Info: figuras/logo_usc-eps-converted-to.pdf  used on input line 3.
 (pdftex.def)             Requested size: 113.81102pt x 73.87013pt.
 
-Overfull \hbox (3.39912pt too wide) in paragraph at lines 6--7
+Overfull \hbox (3.40044pt too wide) in paragraph at lines 6--7
 []\OT1/cmr/bx/n/12 D. (No-me da ti-to-ra ou do ti-tor)\OT1/cmr/m/n/12 , Pro-fe-so-r/a do De-par-ta-men-to de Electr^^Soni-
  []
 
@@ -254,22 +363,22 @@ Overfull \hbox (3.39912pt too wide) in paragraph at lines 6--7
 ] (./traballo.toc
 LaTeX Info: Redefining \. on input line 1.
 LaTeX Info: Redefining \% on input line 1.
-)
+ [7
+
+])
 \tf@toc=\write3
 \openout3 = `traballo.toc'.
 
- [7
-
-] [8
-
-] (./traballo.lof
+ [8] (./traballo.lof
 LaTeX Info: Redefining \. on input line 1.
 LaTeX Info: Redefining \% on input line 1.
 )
 \tf@lof=\write4
 \openout4 = `traballo.lof'.
 
- [9] [10
+ [9
+
+] [10
 
 ] (./traballo.lot
 LaTeX Info: Redefining \. on input line 1.
@@ -292,8 +401,8 @@ Cap\'{\i }tulo 1.
 LaTeX Info: Redefining \. on input line 23.
 LaTeX Info: Redefining \% on input line 23.
  [2]) [3]
-LaTeX Info: Redefining \. on input line 53.
-LaTeX Info: Redefining \% on input line 53.
+LaTeX Info: Redefining \. on input line 56.
+LaTeX Info: Redefining \% on input line 56.
  [4
 
 
@@ -307,22 +416,12 @@ Cap\'{\i }tulo 2.
 
 
 ]
-LaTeX Info: Redefining \. on input line 20.
-LaTeX Info: Redefining \% on input line 20.
-
-Overfull \hbox (16.33667pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/12 6 \OT1/cmr/m/sl/12 CAP[]ITULO 2.  ESTADO DE CONOCIMIENTO DEL PROBLEMA A ABORDAR
- []
-
-[6]) [7]
-LaTeX Info: Redefining \. on input line 55.
-LaTeX Info: Redefining \% on input line 55.
-
-Overfull \hbox (16.33667pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/12 8 \OT1/cmr/m/sl/12 CAP[]ITULO 2.  ESTADO DE CONOCIMIENTO DEL PROBLEMA A ABORDAR
- []
-
-[8
+LaTeX Info: Redefining \. on input line 18.
+LaTeX Info: Redefining \% on input line 18.
+ [6]) [7]
+LaTeX Info: Redefining \. on input line 58.
+LaTeX Info: Redefining \% on input line 58.
+ [8
 
 
 
@@ -332,17 +431,76 @@ Overfull \hbox (16.33667pt too wide) has occurred while \output is active
  (./capitulos/cap3.tex
 Cap\'{\i }tulo 3.
 
-Overfull \hbox (112.66519pt too wide) in paragraph at lines 7--17
- [] 
+Overfull \hbox (5.9679pt too wide) in paragraph at lines 16--17
+\OT1/cmr/m/it/12 Com-pi-ler Co-llec-tion \OT1/cmr/m/n/12 (GCC), car-gan-do expl^^S^^Pci-ta-men-te el m^^Sodu-lo \OT1/cmtt/m/n/12 gcc/12.3.0\OT1/cmr/m/n/12 . 
  []
 
-) [9
+[9
 
 
 ]
-LaTeX Info: Redefining \. on input line 57.
-LaTeX Info: Redefining \% on input line 57.
- [10
+LaTeX Info: Redefining \. on input line 35.
+LaTeX Info: Redefining \% on input line 35.
+ [10]
+LaTeX Info: Redefining \. on input line 78.
+LaTeX Info: Redefining \% on input line 78.
+ [11]
+LaTeX Info: Redefining \. on input line 101.
+LaTeX Info: Redefining \% on input line 101.
+ [12]
+LaTeX Info: Redefining \. on input line 120.
+LaTeX Info: Redefining \% on input line 120.
+ [13]
+LaTeX Info: Redefining \. on input line 150.
+LaTeX Info: Redefining \% on input line 150.
+ [14]
+LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <12> not available
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 161.
+LaTeX Font Info:    Trying to load font information for OML+cmtt on input line 167.
+LaTeX Font Info:    No file OMLcmtt.fd. on input line 167.
+
+
+LaTeX Font Warning: Font shape `OML/cmtt/m/n' undefined
+(Font)              using `OML/cmm/m/it' instead
+(Font)              for symbol `textless' on input line 167.
+
+LaTeX Info: Redefining \. on input line 168.
+LaTeX Info: Redefining \% on input line 168.
+[15]
+Underfull \hbox (badness 10000) in paragraph at lines 200--200
+[]|\OT1/cmr/m/it/12 bildstein[]station1[]
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 200--200
+[]|\OT1/cmr/m/n/12 LiDAR a^^Sereo ob-te-ni-do
+ []
+
+
+Overfull \hbox (2.06648pt too wide) in paragraph at lines 200--200
+[]|\OT1/cmr/m/it/12 Paris[]Luxembourg[]6| 
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 200--200
+[]|\OT1/cmr/m/it/12 PNOA[]2024[]PNR
+ []
+
+
+Underfull \hbox (badness 3724) in paragraph at lines 200--200
+[]|\OT1/cmr/m/n/12 Cobertura del te-rri-to-rio
+ []
+
+)
+LaTeX Info: Redefining \. on input line 59.
+LaTeX Info: Redefining \% on input line 59.
+ [16]
+LaTeX Info: Redefining \. on input line 59.
+LaTeX Info: Redefining \% on input line 59.
+ [17]
+LaTeX Info: Redefining \. on input line 60.
+LaTeX Info: Redefining \% on input line 60.
+ [18
 
 
 
@@ -351,13 +509,13 @@ LaTeX Info: Redefining \% on input line 57.
 
  (./capitulos/cap4.tex
 Cap\'{\i }tulo 4.
-) [11
+) [19
 
 
 ]
-LaTeX Info: Redefining \. on input line 59.
-LaTeX Info: Redefining \% on input line 59.
- [12
+LaTeX Info: Redefining \. on input line 62.
+LaTeX Info: Redefining \% on input line 62.
+ [20
 
 
 
@@ -366,13 +524,13 @@ LaTeX Info: Redefining \% on input line 59.
 
  (./capitulos/cap5.tex
 Cap\'{\i }tulo 5.
-) [13
+) [21
 
 
 ]
-LaTeX Info: Redefining \. on input line 61.
-LaTeX Info: Redefining \% on input line 61.
- [14
+LaTeX Info: Redefining \. on input line 64.
+LaTeX Info: Redefining \% on input line 64.
+ [22
 
 
 
@@ -381,13 +539,13 @@ LaTeX Info: Redefining \% on input line 61.
 
  (./capitulos/cap6.tex
 Cap\'{\i }tulo 6.
-) [15
+) [23
 
 
 ]
-LaTeX Info: Redefining \. on input line 63.
-LaTeX Info: Redefining \% on input line 63.
- [16
+LaTeX Info: Redefining \. on input line 66.
+LaTeX Info: Redefining \% on input line 66.
+ [24
 
 
 
@@ -396,7 +554,7 @@ LaTeX Info: Redefining \% on input line 63.
 
  (./capitulos/exemplos.tex
 Cap\'{\i }tulo 7.
-[17
+[25
 
 
 ]
@@ -409,22 +567,19 @@ Package epstopdf Info: Source file: <figuras/figura01.eps>
 (epstopdf)             Command: <repstopdf --outfile=figuras/figura01-eps-converted-to.pdf figuras/figura01.eps>
 (epstopdf)             \includegraphics on input line 30.
 Package epstopdf Info: Output file is already uptodate.
-<figuras/figura01-eps-converted-to.pdf, id=119, 1060.96375pt x 513.92pt>
+<figuras/figura01-eps-converted-to.pdf, id=147, 1060.96375pt x 513.92pt>
 File: figuras/figura01-eps-converted-to.pdf Graphic file (type pdf)
 <use figuras/figura01-eps-converted-to.pdf>
 Package pdftex.def Info: figuras/figura01-eps-converted-to.pdf  used on input line 30.
 (pdftex.def)             Requested size: 426.79134pt x 206.73277pt.
-
-Underfull \vbox (badness 1019) has occurred while \output is active []
-
 LaTeX Info: Redefining \. on input line 55.
 LaTeX Info: Redefining \% on input line 55.
 
-Overfull \hbox (1.62976pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/12 18 \OT1/cmr/m/sl/12 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
+Overfull \hbox (1.63756pt too wide) has occurred while \output is active
+\OT1/cmr/m/n/12 26 \OT1/cmr/m/sl/12 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
  []
 
-[18 <./figuras/figura01-eps-converted-to.pdf>] (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
+[26 <./figuras/figura01-eps-converted-to.pdf>] (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2023/02/27 1.9 listings language file
 ) (/usr/share/texlive/texmf-dist/tex/latex/listings/lstmisc.sty
 File: lstmisc.sty 2023/02/27 1.9 (Carsten Heinz)
@@ -449,17 +604,17 @@ Overfull \hbox (53.36043pt too wide) in paragraph at lines 97--98
  []
 
 )
-LaTeX Info: Redefining \. on input line 64.
-LaTeX Info: Redefining \% on input line 64.
- [19]
-LaTeX Info: Redefining \. on input line 68.
-LaTeX Info: Redefining \% on input line 68.
+LaTeX Info: Redefining \. on input line 67.
+LaTeX Info: Redefining \% on input line 67.
+ [27]
+LaTeX Info: Redefining \. on input line 71.
+LaTeX Info: Redefining \% on input line 71.
 
-Overfull \hbox (1.62976pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/12 20 \OT1/cmr/m/sl/12 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
+Overfull \hbox (1.63756pt too wide) has occurred while \output is active
+\OT1/cmr/m/n/12 28 \OT1/cmr/m/sl/12 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
  []
 
-[20
+[28
 
 
 
@@ -468,13 +623,13 @@ Overfull \hbox (1.62976pt too wide) has occurred while \output is active
 
  (./capitulos/conclusions.tex
 Cap\'{\i }tulo 8.
-) [21
+) [29
 
 
 ]
-LaTeX Info: Redefining \. on input line 73.
-LaTeX Info: Redefining \% on input line 73.
- [22
+LaTeX Info: Redefining \. on input line 76.
+LaTeX Info: Redefining \% on input line 76.
+ [30
 
 
 
@@ -483,13 +638,13 @@ LaTeX Info: Redefining \% on input line 73.
 
  (./capitulos/apendicea.tex
 Ap\'{e}ndice A.
-) [23
+) [31
 
 
 ]
-LaTeX Info: Redefining \. on input line 75.
-LaTeX Info: Redefining \% on input line 75.
- [24
+LaTeX Info: Redefining \. on input line 78.
+LaTeX Info: Redefining \% on input line 78.
+ [32
 
 
 
@@ -498,13 +653,13 @@ LaTeX Info: Redefining \% on input line 75.
 
  (./capitulos/apendiceb.tex
 Ap\'{e}ndice B.
-) [25
+) [33
 
 
 ]
-LaTeX Info: Redefining \. on input line 77.
-LaTeX Info: Redefining \% on input line 77.
- [26
+LaTeX Info: Redefining \. on input line 80.
+LaTeX Info: Redefining \% on input line 80.
+ [34
 
 
 
@@ -513,13 +668,13 @@ LaTeX Info: Redefining \% on input line 77.
 
  (./capitulos/licenza.tex
 Ap\'{e}ndice C.
-) [27
+) [35
 
 
 ]
-LaTeX Info: Redefining \. on input line 79.
-LaTeX Info: Redefining \% on input line 79.
- [28
+LaTeX Info: Redefining \. on input line 82.
+LaTeX Info: Redefining \% on input line 82.
+ [36
 
 
 
@@ -536,7 +691,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 10--11
 []\OT1/cmr/m/n/12 Acceso m^^Sulti-ple por di-vi-si^^Son de c^^Sodi-go. Ar-ti-go da wi-ki-pe-dia
  []
 
-) [29
+) [37
 
 
 ] (./traballo.aux (./capitulos/titulo.aux)
@@ -549,22 +704,22 @@ L3 programming layer <2024-01-22>
  ***********
 
 
-LaTeX Warning: There were multiply-defined labels.
+LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
  ) 
 Here is how much of TeX's memory you used:
- 5880 strings out of 476120
- 96152 string characters out of 5793658
+ 7372 strings out of 476120
+ 119356 string characters out of 5793658
  1940975 words of memory out of 5000000
- 27714 multiletter control sequences out of 15000+600000
+ 29148 multiletter control sequences out of 15000+600000
  568292 words of font info for 74 fonts, out of 8000000 for 9000
  41 hyphenation exceptions out of 8191
- 57i,11n,65p,1341b,1319s stack positions out of 10000i,1000n,20000p,200000b,200000s
- </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1200.600pk> </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcti1200.600pk></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsl12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt12.pfb>
-Output written on traballo.pdf (43 pages, 250176 bytes).
+ 61i,12n,69p,1341b,1316s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcti1200.600pk> </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1200.600pk></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsl12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
+Output written on traballo.pdf (51 pages, 295073 bytes).
 PDF statistics:
- 238 PDF objects out of 1000 (max. 8388607)
- 155 compressed objects within 2 object streams
+ 269 PDF objects out of 1000 (max. 8388607)
+ 175 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
  11 words of extra memory for PDF output out of 10000 (max. 10000000)
 

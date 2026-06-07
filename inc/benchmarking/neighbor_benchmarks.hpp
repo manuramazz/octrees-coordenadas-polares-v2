@@ -486,26 +486,6 @@ class NeighborsBenchmark {
                         }else{
                             std::cout << "Debug ranges enabled but reorder mode is none, skipping search!\n";
                         }
-                    }else if (mainOptions.debugLeavesTime){
-                        if(mode == ReorderMode::Polar){
-                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
-                                for(size_t i = 0; i<searchSet.numSearches; i++) {
-                                    auto result = oct.template neighborsPrunePolarTimesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
-                                    averageResultSize += result.size();
-                                }
-                        }else if(mode == ReorderMode::Cartesian){
-                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
-                                for(size_t i = 0; i<searchSet.numSearches; i++) {
-                                    auto result = oct.template neighborsPruneCartesianTimesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
-                                    averageResultSize += result.size();
-                                }
-                        }else{
-                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
-                                for(size_t i = 0; i<searchSet.numSearches; i++) {
-                                    auto result = oct.template neighborsPruneNoneTimesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
-                                    averageResultSize += result.size();
-                                }
-                        }
                     }else{
                         if(mode == ReorderMode::Polar){
                             #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
@@ -538,16 +518,30 @@ class NeighborsBenchmark {
                 auto neighborsSearchStruct = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
-                    #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
-                        for(size_t i = 0; i<searchSet.numSearches; i++) {
-                            auto result = oct.template neighborsStruct<kernel>(points[searchIndexes[i]], radius, getRange, mode);
-                            averageResultSize += result.size();
-                        }
+                    // Enviar a la función adecuada en función de la reordenación
+                    if(mode == ReorderMode::Polar){
+                        #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                            for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                auto result = oct.template neighborsStructPolar<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                averageResultSize += result.size();
+                            }
+                    }else if(mode == ReorderMode::Cartesian){
+                        std::cout << "Cartesian reordered is not suported with neighborsStruct, skipping searches!\n"; 
+                    }else{
+                        #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
+                            for(size_t i = 0; i<searchSet.numSearches; i++) {
+                                auto result = oct.template neighborsStruct<kernel>(points[searchIndexes[i]], radius, getRange, mode);
+                                averageResultSize += result.size();
+                            }
+                    }
+                
                     averageResultSize /= searchSet.numSearches;
                     searchSet.nextRepeat();
                     return averageResultSize;
                 };
-                executeBenchmark(neighborsSearchStruct, kernelName, SearchAlgo::NEIGHBORS_STRUCT, reorderModeStr);
+                if (!mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS_STRUCT) || mode != ReorderMode::Cartesian){
+                    executeBenchmark(neighborsSearchStruct, kernelName, SearchAlgo::NEIGHBORS_STRUCT, reorderModeStr);
+                }
             }
         }
 
