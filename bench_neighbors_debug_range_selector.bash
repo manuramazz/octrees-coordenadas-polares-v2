@@ -11,10 +11,10 @@ datasets_low_density=(
 )
 
 datasets_mid_density=(
-    "data/hessigheim/Mar18_train.las"
-    "data/hessigheim/Mar18_test.las"
     "data/paris_lille/Lille_0.las"
     "data/paris_lille/Paris_Luxembourg_6.las"
+    "data/hessigheim/Mar18_train.las"
+    "data/hessigheim/Mar18_test.las"
 )
 datasets_high_density=(
     "data/semantic3d/bildstein_station1_xyz_intensity_rgb.las" 
@@ -23,6 +23,8 @@ datasets_high_density=(
 
 N_SEARCHES="60"
 ALGOS_RADIUS="neighborsPrune"
+LOCAL_REORDERS="none,polar,cartesian"
+
 
 # range debug searches (subsets)
 for data in "${datasets_low_density[@]}"; do
