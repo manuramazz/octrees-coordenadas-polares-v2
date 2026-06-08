@@ -472,13 +472,11 @@ class NeighborsBenchmark {
                     // Enviar a la función adecuada en función de la reordenación, o de si hay un modo debug habilitado
                     if(mainOptions.debugRanges){
                         if(mode == ReorderMode::Polar){
-                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                                 for(size_t i = 0; i<searchSet.numSearches; i++) {
                                     auto result = oct.template neighborsPrunePolarRangesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
                                     averageResultSize += result.size();
                                 }
                         }else if(mode == ReorderMode::Cartesian){
-                            #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                                 for(size_t i = 0; i<searchSet.numSearches; i++) {
                                     auto result = oct.template neighborsPruneCartesianRangesDebug<kernel>(points[searchIndexes[i]], radius, getRange, mode);
                                     averageResultSize += result.size();

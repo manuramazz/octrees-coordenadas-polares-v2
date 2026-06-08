@@ -22,19 +22,18 @@ datasets_high_density=(
 )
 
 N_SEARCHES="60"
-ALGO="neighborsPrune"
+ALGOS_RADIUS="neighborsPrune"
 
 # range debug searches (subsets)
 for data in "${datasets_low_density[@]}"; do
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "1.0,2.0,3.0,5.0,6.0,7.0,8.0,10.0" -s "$N_SEARCHES" --repeats 1 -a "$ALGOS_RADIUS" --local-reorder "$LOCAL_REORDERS" --num-threads 1 --debug-ranges
+  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "1.0,2.0,3.0,5.0,6.0,7.0,8.0,10.0" -s "$N_SEARCHES" --repeats 1 -a "$ALGOS_RADIUS" --local-reorder "$LOCAL_REORDERS" --debug-ranges --num-threads 1 
 done
 
 # subset searches
 for data in "${datasets_mid_density[@]}"; do
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.25,0.5,0.75,1.0,1.5,2.0,3.0,5.0" -s "$N_SEARCHES" --repeats 1 -a "$ALGOS_RADIUS" --local-reorder "$LOCAL_REORDERS" --num-threads 1 --debug-ranges
-
+  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.25,0.5,0.75,1.0,1.5,2.0,3.0,5.0" -s "$N_SEARCHES" --repeats 1 -a "$ALGOS_RADIUS" --local-reorder "$LOCAL_REORDERS" --debug-ranges --num-threads 1
 done
 
 for data in "${datasets_high_density[@]}"; do
-  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.005,0.01,0.025,0.05,0.1,0.15,0.2,0.3" -s "$N_SEARCHES" --repeats 1 -a "$ALGOS_RADIUS" --local-reorder "$LOCAL_REORDERS" --num-threads 1 --debug-ranges
+  ./build/octrees-benchmark -i "$data" -o "$FOLDER" -e "hilb" --kernels "cube,sphere" -r "0.005,0.01,0.025,0.05,0.1,0.15,0.2,0.3" -s "$N_SEARCHES" --repeats 1 -a "$ALGOS_RADIUS" --local-reorder "$LOCAL_REORDERS" --debug-ranges --num-threads 1
 done
