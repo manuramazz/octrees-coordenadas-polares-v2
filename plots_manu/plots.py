@@ -711,11 +711,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.ticker as ticker
-
 def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius="all"):
     """
     Consolida todos los archivos en un único DataFrame y genera una figura independiente
     para cada valor de radio, mostrando 'maxPointsLeaf' en el eje X con gráficos de barras.
+    Muestra 5 barras por grupo basándose en la combinación de algoritmo y ordenación.
     Devuelve una lista de objetos Figure de Matplotlib.
     """
     # 1. Consolidar DataFrames
@@ -744,8 +744,39 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
     if df_global.empty:
         return []
 
-    # Dejamos los nombres originales de tus experimentos tal y como vienen mapeados en tu script
-    df_global['experiment'] = df_global['reorder'].apply(lambda x: "Base" if x == 'none' else f"Reordered ({x})")
+    # --- MODIFICACIÓN: Crear el mapeo para las 5 combinaciones requeridas ---
+    def mapear_experimento(row):
+        op = row['operation']
+        re = row['reorder']
+        
+        if op == "neighborsStruct":
+            if re == "none":  return "Struct - None"
+            if re == "polar": return "Struct - Polar"
+        elif op == "neighborsPrune":
+            if re == "none":      return "Prune - None"
+            if re == "polar":     return "Prune - Polar"
+            if re == "cartesian": return "Prune - Cartesian"
+        return None # Por si acaso hay combinaciones inválidas en el CSV
+
+    df_global['experiment'] = df_global.apply(mapear_experimento, axis=1)
+    
+    # Limpiamos posibles filas que no entren en las 5 combinaciones deseadas
+    df_global = df_global.dropna(subset=['experiment'])
+
+    # Definimos un orden fijo estricto para que la leyenda y las barras siempre salgan igual
+    orden_experimentos = [
+        "Struct - None", "Struct - Polar", 
+        "Prune - None", "Prune - Polar", "Prune - Cartesian"
+    ]
+    
+    # Paleta de colores personalizada (Tonos azules/morados para Struct, verdes/cálidos para Prune)
+    colores_5_barras = {
+        "Struct - None": "#4A90E2",       # Azul
+        "Struct - Polar": "#9013FE",      # Morado
+        "Prune - None": "#50E3C2",       # Turquesa/Verde menta
+        "Prune - Polar": "#B8E986",      # Verde claro
+        "Prune - Cartesian": "#F5A623"   # Naranja
+    }
 
     # Mapeo TeX para la notación matemática formal de los Kernels
     kernel_titles = {
@@ -768,10 +799,9 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
         n_kernels = len(unique_kernels)
         
         # Creamos los subplots compartiendo el eje Y
-        fig, axes = plt.subplots(1, n_kernels, figsize=(6.5 * n_kernels, 5), sharey=True, squeeze=False)
+        fig, axes = plt.subplots(1, n_kernels, figsize=(7.5 * n_kernels, 5.5), sharey=True, squeeze=False)
         axes = axes.flatten()
         
-        # Guardaremos los handles de las barras para crear la leyenda global
         handles, labels = [], []
         
         for i, kern in enumerate(unique_kernels):
@@ -782,12 +812,14 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
                 ax.set_title(f"No hay datos para {kern}")
                 continue
                 
-            # Renderizado del gráfico de barras
+            # Renderizado del gráfico de barras con las 5 configuraciones
             bp = sns.barplot(
                 data=data_kernel, 
                 x='maxPointsLeaf', 
                 y='mean', 
-                hue='experiment', 
+                hue='experiment',
+                hue_order=orden_experimentos, # Forzar orden de las 5 barras
+                palette=colores_5_barras,     # Aplicar colores fijos
                 ax=ax,
                 edgecolor='#444444',
                 linewidth=0.8,
@@ -800,7 +832,7 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
             if ax.get_legend() is not None:
                 ax.get_legend().remove() 
             
-            # --- MODIFICACIÓN: Título con Radio y Notación del Kernel ---
+            # Título con Radio y Notación del Kernel
             tex_kernel = kernel_titles.get(kern.lower(), f'{kern.upper()}')
             ax.set_title(f'{tex_kernel}\n' r'$r = ' f'{rad}\ m$', fontsize=13, pad=10)
             
@@ -820,29 +852,30 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
             fig.legend(
                 handles, labels,
                 loc="upper center",
-                bbox_to_anchor=(0.5, 0.98),  # Centrado en la parte superior de la figura
-                ncol=len(labels),             # Una sola fila con todas las opciones
+                bbox_to_anchor=(0.5, 0.98),  # Centrado arriba
+                ncol=len(labels),            # Forzar una única fila con los 5 elementos
                 frameon=True,
                 facecolor='white',
                 edgecolor='#CCCCCC',
                 fontsize=11,
                 handlelength=1.8,
                 handletextpad=0.5,
-                columnspacing=1.5
+                columnspacing=1.2
             )
         
-        # Ajuste de márgenes para dar espacio arriba a la leyenda y los títulos
-        plt.subplots_adjust(left=0.08, right=0.95, bottom=0.15, top=0.78, wspace=0.15)
+        # Ajuste adaptativo de márgenes para que entren bien las etiquetas y la leyenda de 5 columnas
+        plt.subplots_adjust(left=0.08, right=0.95, bottom=0.15, top=0.76, wspace=0.15)
         
         figs.append(fig)
         
     return figs
 
-def plot_threshold_heatmap_comparison(data_path, cloud, reorder_mode="all", allFiles=True, kernel="all", radius="all"):
+
+def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="all", radius="all"):
     """
-    Genera figuras independientes por cada valor de radio. Cada figura contiene subplots
-    en forma de mapas de calor para encontrar la combinación óptima de 'threshold' y 'maxPointsLeaf'.
-    Los títulos de cada gráfico muestran la notación matemática formal del kernel y el radio.
+    Consolida los archivos, calcula el mínimo tiempo global por radio (para normalizar en igualdad de condiciones),
+    obtiene el Speedup relativo y promedia los resultados colapsando las dimensiones de Radio y Kernel.
+    Genera 3 figuras independientes por dataset para las combinaciones objetivo.
     Devuelve una lista de objetos Figure de Matplotlib.
     """
     # 1. Consolidar DataFrames
@@ -858,101 +891,90 @@ def plot_threshold_heatmap_comparison(data_path, cloud, reorder_mode="all", allF
         return []
 
     df_global = pd.concat(dfs_list, ignore_index=True)
-    mask = (df_global['reorder'] == reorder_mode)
-    df_filtered = df_global[mask].copy()
 
+    # Aplicar filtros opcionales de ejecución
     if kernel != "all":
         if isinstance(kernel, str): kernel = [kernel]
-        df_filtered = df_filtered[df_filtered["kernel"].isin(kernel)]
+        df_global = df_global[df_global["kernel"].isin(kernel)]
         
     if radius != "all":
         if not isinstance(radius, list): radius = [radius]
-        df_filtered = df_filtered[df_filtered["radius"].isin(radius)]
+        df_global = df_global[df_global["radius"].isin(radius)]
 
-    if df_filtered.empty:
-        print(f"Advertencia: No hay datos que coincidan con los filtros aplicados para {cloud}.")
+    if df_global.empty:
         return []
 
-    # Mapeo TeX para la notación matemática formal de los Kernels
-    kernel_titles = {
-        'circle': r'$\mathcal{N}_{Circle}$',
-        'sphere': r'$\mathcal{N}_{Sphere}$',
-        'square': r'$\mathcal{N}_{Square}$',
-        'cube': r'$\mathcal{N}_{Cube}$'
-    }
+    # --- PASO METODOLÓGICO 1: Calcular T_base (mínimo absoluto global por radio) ---
+    # Buscamos el tiempo mínimo ('mean') para cada radio sin importar kernel, operation o reorder.
+    dict_t_base = df_global.groupby('radius')['mean'].min().to_dict()
+    
+    # Asignamos el tiempo base correspondiente a cada fila para calcular el speedup relativo
+    df_global['T_base'] = df_global['radius'].map(dict_t_base)
+    df_global['speedup'] = df_global['T_base'] / df_global['mean']
 
-    # Extraer los radios y kernels únicos presentes tras los filtros
-    unique_radii = sorted(df_filtered['radius'].unique())
-    unique_kernels = df_filtered['kernel'].unique()
+    # --- PASO METODOLÓGICO 2: Definir las 3 combinaciones objetivo ---
+    combinaciones = [
+        {"operation": "neighborsPrune",  "reorder": "polar",     "titulo": "Prune - Polar"},
+        {"operation": "neighborsPrune",  "reorder": "cartesian", "titulo": "Prune - Cartesian"},
+        {"operation": "neighborsStruct", "reorder": "polar",     "titulo": "Struct - Polar"}
+    ]
 
-    figs = []  # Array para acumular las figuras (una por cada radio)
+    figs = []
 
-    # 2. Bucle exterior: Una figura diferente por cada valor de RADIO
-    for rad in unique_radii:
-        df_rad = df_filtered[df_filtered['radius'] == rad].copy()
-        if df_rad.empty: 
+    # --- PASO METODOLÓGICO 3: Generar las 3 figuras independientes ---
+    for comb in combinaciones:
+        # Filtrar por la combinación específica
+        mask = (df_global['operation'] == comb['operation']) & (df_global['reorder'] == comb['reorder'])
+        df_comb = df_global[mask].copy()
+        
+        if df_comb.empty:
+            print(f"Aviso: Sin datos para la combinación {comb['titulo']}. Saltando figura...")
             continue
 
-        n_kernels = len(unique_kernels)
-        
-        # Estructura de subplots en horizontal compartiendo el eje Y (maxPointsLeaf)
-        fig, axes = plt.subplots(1, n_kernels, figsize=(7.5 * n_kernels, 5.5), sharey=True, squeeze=False)
-        axes = axes.flatten()
-        
-        # Buscamos los límites mínimos y máximos específicos de este radio 
-        # para que la escala de color (colorbar) sea perfectamente comparable entre subplots
-        vmin = df_rad['mean'].min()
-        vmax = df_rad['mean'].max()
-        
-        for i, kern in enumerate(unique_kernels):
-            ax = axes[i]
-            data_kernel = df_rad[df_rad['kernel'] == kern]
-            
-            if data_kernel.empty:
-                ax.set_title(f"No hay datos para {kern}")
-                continue
-                
-            # Pivotar datos: Filas (maxPointsLeaf), Columnas (threshold), Celda (mean)
-            # Se usa 'maxPointsLeaf' en el index para mantener concordancia de nombres
-            pivot = data_kernel.pivot_table(index='maxPointsLeaf', columns='threshold', 
-                                            values='mean', aggfunc='mean')
-            
-            # Dibujar el mapa de calor
-            # Solo pintamos la barra de color (cbar) en el último mapa de la derecha para no saturar
-            show_cbar = (i == n_kernels - 1)
-            
-            sns.heatmap(
-                pivot, 
-                annot=True, 
-                fmt=".4f",          # Dos decimales para los tiempos medios (puedes poner .0f si son enteros)
-                cmap="coolwarm_r", 
-                ax=ax, 
-                vmin=vmin, 
-                vmax=vmax, 
-                cbar=show_cbar,
-                cbar_kws={'label': 'Tiempo Total (s)'} if show_cbar else None,
-                linewidths=0.5,
-                linecolor='#EEEEEE'
-            )
-            
-            # --- Título con Radio y Notación del Kernel ---
-            tex_kernel = kernel_titles.get(kern.lower(), f'{kern.upper()}')
-            ax.set_title(f'{tex_kernel}\n' r'$r = ' f'{rad}\ m$', fontsize=13, pad=10)
-            
-            # Configuración de los nombres de los ejes
-            ax.set_xlabel('Umbral de Poda (threshold)', fontsize=11)
-            ax.set_ylabel('Puntos máximos por hoja (maxPointsLeaf)' if i == 0 else '', fontsize=11)
-            
-            # Forzar a que las etiquetas del eje Y no se roten de forma extraña
-            ax.tick_params(axis='y', rotation=0)
+        # Promediamos el Speedup juntando (colapsando) Radio, Kernel y cualquier otra dimensión variante
+        # Agrupamos estrictamente por los hiperparámetros que queremos evaluar en los ejes del heatmap
+        df_grouped = df_comb.groupby(['maxPointsLeaf', 'threshold'], as_index=False)['speedup'].mean()
 
-        # Ajuste preciso de los márgenes de la figura para evitar solapamientos
-        plt.subplots_adjust(left=0.10, right=0.92, bottom=0.15, top=0.82, wspace=0.18)
+        # Pivotar datos: Filas (maxPointsLeaf), Columnas (threshold), Celda (Media del Speedup)
+        pivot = df_grouped.pivot_table(index='maxPointsLeaf', columns='threshold', 
+                                       values='speedup', aggfunc='mean')
+
+        # Creamos la figura independiente (1 único plot que engloba la media de kernels y radios)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        # Dibujar el mapa de calor corporativo
+        # Usamos coolwarm (sin _r) porque ahora un valor más alto (más speedup) es mejor (rojo)
+        sns.heatmap(
+            pivot, 
+            annot=True, 
+            fmt=".4f", 
+            cmap="coolwarm", 
+            ax=ax, 
+            vmin=0.0, 
+            vmax=1.0, # El límite superior teórico es 1.0 (el óptimo global)
+            cbar=True,
+            cbar_kws={'label': 'Speedup Relativo Medio (vs Mínimo Global)'},
+            linewidths=0.5,
+            linecolor='#EEEEEE'
+        )
+        
+        # Títulos e identificadores académicos
+        ax.set_title(f"Mapa de Rendimiento General: {comb['titulo']}\n"
+                     , fontsize=14, pad=12)
+        
+        ax.set_xlabel('Umbral de Poda (threshold)', fontsize=11)
+        ax.set_ylabel('Puntos máximos por hoja (maxPointsLeaf)', fontsize=11)
+        ax.tick_params(axis='y', rotation=0)
+
         plt.suptitle(
-            f'Comparación de Configuraciones de Poda\n'
-            f'Dataset: {cloud} | Reorder: {reorder_mode}',
-            fontsize=16, fontweight='bold', y=1.02)
+            f'Análisis de Hiperparámetros de Poda\nDataset: {cloud}',
+            fontsize=15, fontweight='bold', y=1.05
+        )
+        
+        # Ajuste de márgenes
+        plt.subplots_adjust(left=0.12, right=0.95, bottom=0.12, top=0.85)
         plt.show()
+        
         figs.append(fig)
         
     return figs
@@ -1065,7 +1087,170 @@ def plot_octree_parallelization_heatmap(data_path, cloud, mode_filter="all", all
         
     return figs
 
+def plot_scalability_lines(data_path, cloud, best_max_leaf, best_threshold, allFiles=True):
+    """
+    Genera una figura con dos subplots en fila (uno por cada kernel disponible).
+    Muestra la evolución del tiempo total de ejecución (eje Y) según el radio (eje X)
+    para las 5 configuraciones de algoritmo/ordenación.
+    
+    FILTRADO ESPECIAL: Los modos Reordered usan 'best_max_leaf', mientras que 
+    los modos Base (none) usan de forma fija 'maxPointsLeaf = 128'.
+    """
+    # 1. Consolidar DataFrames
+    if allFiles:
+        dfs_list = get_dataset_files_in_dir(data_path, cloud)
+    else:
+        single_df = get_dataset_file(data_path, cloud)
+        dfs_list = [single_df] if single_df is not None else []
 
+    dfs_list = [d for d in dfs_list if d is not None and not d.empty]
+    if not dfs_list:
+        print(f"Advertencia: No se encontraron datos válidos para la nube {cloud}.")
+        return None
+
+    df_global = pd.concat(dfs_list, ignore_index=True)
+
+    # --- FILTRADO CRÍTICO ASIMÉTRICO DE HIPERPARÁMETROS ---
+    # Máscara para modos reordenados (polar, cartesian) -> usan el parámetro óptimo
+    mask_reordered = (df_global['reorder'].isin(['polar', 'cartesian'])) & (df_global['maxPointsLeaf'] == best_max_leaf)
+    
+    # Máscara para modos base (none) -> forzamos el óptimo absoluto de la estructura base
+    mask_base = (df_global['reorder'] == 'none') & (df_global['maxPointsLeaf'] == 128)
+    
+    # Combinamos ambas condiciones válidas y aplicamos el filtro de threshold global
+    df_filtered = df_global[(mask_reordered | mask_base) & (df_global['threshold'] == best_threshold)].copy()
+
+    if df_filtered.empty:
+        print(f"⚠️ Alerta: No hay datos que coincidan con los criterios (Reorder Leaf={best_max_leaf}, Base Leaf=128)")
+        return None
+
+    # --- MAPEO DE LAS 5 SERIES TEMPORALES ---
+    def mapear_series(row):
+        op = row['operation']
+        re = row['reorder']
+        if op == "neighborsStruct":
+            if re == "none":  return "Struct - None (Base, mPL=128)"
+            if re == "polar": return f"Struct - Polar (mPL={best_max_leaf})"
+        elif op == "neighborsPrune":
+            if re == "none":      return "Prune - None (mPL=128)"
+            if re == "polar":     return f"Prune - Polar (mPL={best_max_leaf})"
+            if re == "cartesian": return f"Prune - Cartesian (mPL={best_max_leaf})"
+        return None
+
+    df_filtered['series'] = df_filtered.apply(mapear_series, axis=1)
+    df_filtered = df_filtered.dropna(subset=['series'])
+
+    # --- AGRUPACIÓN (MEDIA DE ENCODERS) ---
+    df_plot = df_filtered.groupby(['kernel', 'radius', 'series'], as_index=False)['mean'].mean()
+
+    # Configuración estética de las series con las nuevas etiquetas dinámicas
+    orden_series = [
+        "Struct - None (Base, mPL=128)", f"Struct - Polar (mPL={best_max_leaf})", 
+        "Prune - None (mPL=128)", f"Prune - Polar (mPL={best_max_leaf})", f"Prune - Cartesian (mPL={best_max_leaf})"
+    ]
+    
+    colores_series = {
+        "Struct - None (Base, mPL=128)":        "#4A90E2",
+        f"Struct - Polar (mPL={best_max_leaf})":     "#9013FE",
+        "Prune - None (mPL=128)":               "#50E3C2",
+        f"Prune - Polar (mPL={best_max_leaf})":      "#B8E986",
+        f"Prune - Cartesian (mPL={best_max_leaf})":  "#F5A623"
+    }
+    
+    marcadores_series = {
+        "Struct - None (Base, mPL=128)":        "o",
+        f"Struct - Polar (mPL={best_max_leaf})":     "s",
+        "Prune - None (mPL=128)":               "^",
+        f"Prune - Polar (mPL={best_max_leaf})":      "D",
+        f"Prune - Cartesian (mPL={best_max_leaf})":  "X"
+    }
+
+    # Mapeo matemático TeX para los Kernels
+    kernel_titles = {
+        'circle': r'$\mathcal{N}_{Circle}$ (2D)',
+        'sphere': r'$\mathcal{N}_{Sphere}$ (3D)',
+        'square': r'$\mathcal{N}_{Square}$ (2D)',
+        'cube':   r'$\mathcal{N}_{Cube}$ (3D)'
+    }
+
+    unique_kernels = sorted(df_plot['kernel'].unique())
+    if len(unique_kernels) > 2:
+        unique_kernels = unique_kernels[:2]
+        
+    n_kernels = len(unique_kernels)
+
+    # 2. CREACIÓN DE LA FIGURA
+    fig, axes = plt.subplots(1, n_kernels, figsize=(7.2 * n_kernels, 5.8), sharey=False, squeeze=False)
+    axes = axes.flatten()
+
+    handles, labels = [], []
+
+    for i, kern in enumerate(unique_kernels):
+        ax = axes[i]
+        data_kernel = df_plot[df_plot['kernel'] == kern]
+        
+        for nombre_serie in orden_series:
+            data_serie = data_kernel[data_kernel['series'] == nombre_serie].sort_values('radius')
+            
+            if data_serie.empty: continue
+            
+            line, = ax.plot(
+                data_serie['radius'], 
+                data_serie['mean'],
+                label=nombre_serie,
+                color=colores_series[nombre_serie],
+                marker=marcadores_series[nombre_serie],
+                linewidth=2,
+                markersize=7,
+                alpha=0.9
+            )
+            
+        if not handles:
+            handles, labels = ax.get_legend_handles_labels()
+
+        # Estilización del subplot
+        tex_title = kernel_titles.get(kern.lower(), kern.upper())
+        ax.set_title(f'Comportamiento en Vecindario {tex_title}', fontsize=13, pad=12, fontweight='bold')
+        ax.set_xlabel('Radio de búsqueda ($r$)', fontsize=11)
+        ax.set_ylabel('Total Runtime (s)', fontsize=11)
+        
+        ax.grid(True, which="both", ls=":", alpha=0.3)
+        
+        # Escalas logarítmicas en ambos ejes
+        ax.set_yscale('log')
+        ax.set_xscale('log')
+        ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{y:g}'))
+        
+        # Ajustar xticks con los valores reales del CSV
+        radios_reales = sorted(data_kernel['radius'].unique())
+        ax.set_xticks(radios_reales)
+        ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:g}'))
+        ax.tick_params(axis='both', which='major', labelsize=10)
+
+    # --- LEYENDA GLOBAL SUPERIOR ---
+    if handles:
+        fig.legend(
+            handles, labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.98),
+            ncol=len(labels),
+            frameon=True,
+            facecolor='white',
+            edgecolor='#CCCCCC',
+            fontsize=10,
+            columnspacing=1.2
+        )
+
+    # Título principal adaptado a la asimetría metodológica
+    plt.suptitle(
+        f'Análisis de Escalabilidad y Rendimiento Temporal Asimétrico\n'
+        f'Dataset: {cloud} | Configuración Fija: Reordered maxPointsLeaf={best_max_leaf}, Base maxPointsLeaf=128, threshold={best_threshold}',
+        fontsize=13, fontweight='bold', y=1.05
+    )
+
+    plt.subplots_adjust(left=0.08, right=0.94, bottom=0.14, top=0.80, wspace=0.24)
+
+    return fig
 
 
 ##########################################################

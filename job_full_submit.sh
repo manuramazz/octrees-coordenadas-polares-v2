@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# --- Configuración de Slurm ---
+#SBATCH -p compute           # Partición (cola) de computación general
+#SBATCH -n 1                 # Un solo "task" (tu script de bash)
+#SBATCH -c 40                # Reservar 40 núcleos (coincide con tu THREADS máximo)
+#SBATCH --mem=20G            # Memoria RAM (ajusta según el peso de Semantic3D)
+#SBATCH -t 14:00:00          # Tiempo máximo (HH:MM:SS) - sube a 12h si el full search es lento
+#SBATCH -J out_tfg_full_v3    # Nombre del trabajo
+#SBATCH -o logs/bench_%j.out # Archivo de salida (crea la carpeta logs antes)
+#SBATCH -e logs/bench_%j.err # Archivo de errores
+#SBATCH --mail-type=END,FAIL # Notificar al finalizar o si falla
+#SBATCH --mail-user=manuel.ramallo@rai.usc.es
+
+module purge
+module load gcc/12.3.0
+module load papi
+
+chmod +x bench_neighbors_full_reorders.bash
+
+echo "Iniciando benchmark"
+echo "Fecha: $(date)"
+
+bash bench_neighbors_full_reorders.bash
+
+echo "Benchmark finalizado: $(date)"
+echo "l"
