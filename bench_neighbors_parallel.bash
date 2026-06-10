@@ -1,5 +1,5 @@
 # setup
-FOLDER="out_tfg_reorders_v2"
+FOLDER="out_tfg_reorders_v3"
 set -e
 mkdir -p "$FOLDER"
 
@@ -12,10 +12,10 @@ datasets_low_density=(
 )
 
 datasets_mid_density=(
+    "data/hessigheim/Mar18_train.las"
+    "data/hessigheim/Mar18_test.las"
     "data/paris_lille/Lille_0.las"
-    "data/dales_las/5145_54340.las"
     "data/paris_lille/Paris_Luxembourg_6.las"
-    "data/pnoa/PNOA_2024_PNR_489-4672_NPC01.las"
 )
 datasets_high_density=(
     "data/semantic3d/bildstein_station1_xyz_intensity_rgb.las" 
@@ -32,11 +32,17 @@ UMBRAL=64
 
 # parallel subset searches
 for data in "${datasets_low_density[@]}"; do
-    numactl --interleave=all ./build/octrees-benchmark --kernels "sphere" -i "$data" -o "$FOLDER/parallel_subset" -s "$N_SEARCHES" --repeats 5 -a "$ALGO" --num-threads "$THREADS" -r "2.0,5.0,7.0,10.0" --local-reorder "$LOCAL_REORDERS" --max-leaf "$MAX_POINTS_LEAF" --umbral-poda "$UMBRAL"
+    numactl --interleave=all ./build/octrees-benchmark -e "hilb" --kernels "sphere" -i "$data" -o "$FOLDER/parallel_subset" -s "$N_SEARCHES" --repeats 3 -a "$ALGO" --num-threads "$THREADS" -r "1.0,2.0,3.0" --local-reorder "$LOCAL_REORDERS" --max-leaf "256" --umbral-poda "$umbral"
 done
+
 for data in "${datasets_mid_density[@]}"; do
-    numactl --interleave=all ./build/octrees-benchmark --kernels "sphere" -i "$data" -o "$FOLDER/parallel_subset" -s "$N_SEARCHES" --repeats 5 -a "$ALGO" --num-threads "$THREADS" -r "0.5,1.0,2.0,3.0" --local-reorder "$LOCAL_REORDERS" --max-leaf "$MAX_POINTS_LEAF" --umbral-poda "$UMBRAL"
+    numactl --interleave=all ./build/octrees-benchmark -e "hilb" --kernels "sphere" -i "$data" -o "$FOLDER/parallel_subset" -s "$N_SEARCHES" --repeats 3 -a "$ALGO" --num-threads "$THREADS" -r "0.5,1.0,2.0" --local-reorder "$LOCAL_REORDERS" --max-leaf "256" --umbral-poda "$umbral"
 done
+
 for data in "${datasets_high_density[@]}"; do
-   numactl --interleave=all ./build/octrees-benchmark --kernels "sphere" -i "$data" -o "$FOLDER/parallel_subset" -s "$N_SEARCHES" --repeats 5 -a "$ALGO" --num-threads "$THREADS" -r "0.01,0.05,0.1,0.2" --local-reorder "$LOCAL_REORDERS" --max-leaf "$MAX_POINTS_LEAF" --umbral-poda "$UMBRAL"
+   numactl --interleave=all ./build/octrees-benchmark -e "hilb" --kernels "sphere" -i "$data" -o "$FOLDER/parallel_subset" -s "$N_SEARCHES" --repeats 3 -a "$ALGO" --num-threads "$THREADS" -r "0.01,0.05,0.1" --local-reorder "$LOCAL_REORDERS" --max-leaf "256" --umbral-poda "$umbral"
 done
+
+# parallel full searches (slow)
+numactl --interleave=all ./build/octrees-benchmark -e "hilb" --kernels "sphere" -i "data/paris_lille/Lille_0.las" -o "$FOLDER/parallel_full" -s "all" --sequential --repeats 1 --no-warmup -a "$ALGO" --num-threads $THREADS -r "0.5,1.0,2.0" --local-reorder "$LOCAL_REORDERS" --max-leaf "256" --umbral-poda "$umbral"
+numactl --interleave=all ./build/octrees-benchmark -e "hilb" --kernels "sphere" -i "data/dales_las/test/5095_54440.las" -o "$FOLDER/parallel_full" -s "all" --sequential --repeats 1 --no-warmup -a "$ALGO" --num-threads $THREADS -r "1.0,2.0.3.0" --local-reorder "$LOCAL_REORDERS" --max-leaf "256" --umbral-poda "$umbral"

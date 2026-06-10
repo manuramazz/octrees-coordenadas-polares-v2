@@ -5,30 +5,38 @@
 \contentsline {section}{\numberline {3.1}Equipos de cómputo y entorno de desarrollo}{9}{}%
 \contentsline {section}{\numberline {3.2}Marco teórico matemático}{10}{}%
 \contentsline {subsection}{\numberline {3.2.1}Coordenadas tridimensionales}{10}{}%
-\contentsline {subsection}{\numberline {3.2.2}Curvas de llenado de espacio}{12}{}%
+\contentsline {subsection}{\numberline {3.2.2}Curvas de llenado de espacio}{11}{}%
 \contentsline {subsubsection}{Código de Morton (Curva Z)}{12}{}%
-\contentsline {subsubsection}{Curva de Hilbert}{13}{}%
+\contentsline {subsubsection}{Curva de Hilbert}{12}{}%
 \contentsline {section}{\numberline {3.3}Algoritmos y estructuras de datos de partida}{13}{}%
 \contentsline {subsection}{\numberline {3.3.1}Octree lineal}{13}{}%
 \contentsline {subsection}{\numberline {3.3.2}Algoritmos de búsqueda}{14}{}%
 \contentsline {subsubsection}{Algoritmo \texttt {neighborsPrune}}{15}{}%
 \contentsline {subsubsection}{Algoritmo \texttt {neighborsStruct}}{15}{}%
-\contentsline {section}{\numberline {3.4}Conjuntos de datos empleados}{16}{}%
-\contentsline {chapter}{\numberline {4}Metodología}{19}{}%
-\contentsline {chapter}{\numberline {5}Pruebas}{21}{}%
-\contentsline {chapter}{\numberline {6}Discusión de los resultados}{23}{}%
-\contentsline {chapter}{\numberline {7}Exemplos (eliminar capítulo na versión final)}{25}{}%
-\contentsline {section}{\numberline {7.1}Un exemplo de sección}{25}{}%
-\contentsline {subsection}{\numberline {7.1.1}Un exemplo de subsección}{25}{}%
-\contentsline {subsection}{\numberline {7.1.2}Otro exemplo de subsección}{25}{}%
-\contentsline {subsubsection}{Un exemplo de subsubsección}{25}{}%
-\contentsline {subsubsection}{Un exemplo de subsubsección}{25}{}%
-\contentsline {subsubsection}{Un exemplo de subsubsección}{26}{}%
-\contentsline {section}{\numberline {7.2}Exemplos de figuras e cadros}{26}{}%
-\contentsline {section}{\numberline {7.3}Exemplos de referencias á bibliografía}{26}{}%
-\contentsline {section}{\numberline {7.4}Exemplos de enumeracións}{27}{}%
-\contentsline {chapter}{\numberline {8}Conclusións e posibles ampliacións}{29}{}%
-\contentsline {chapter}{\numberline {A}Manuais técnicos}{31}{}%
-\contentsline {chapter}{\numberline {B}Manuais de usuario}{33}{}%
-\contentsline {chapter}{\numberline {C}Licenza}{35}{}%
-\contentsline {chapter}{Bibliografía}{37}{}%
+\contentsline {section}{\numberline {3.4}Conjuntos de datos empleados}{15}{}%
+\contentsline {chapter}{\numberline {4}Metodología}{17}{}%
+\contentsline {section}{\numberline {4.1}Fundamentos geométricos de la poda en nodos hoja}{17}{}%
+\contentsline {section}{\numberline {4.2}Primera Fase de Implementación: Selectores de rango polares y vectores de permutaciones}{21}{}%
+\contentsline {section}{\numberline {4.3}Análisis de Cuellos de Botella y Rediseño del Sistema}{22}{}%
+\contentsline {section}{\numberline {4.4}Segunda Fase de Implementación: Refactorización y Simplificación de Modelos}{24}{}%
+\contentsline {section}{\numberline {4.5}Construcción de réplicas contiguas e integración en el flujo de búsqueda del Octree}{25}{}%
+\contentsline {chapter}{\numberline {5}Pruebas}{29}{}%
+\contentsline {section}{\numberline {5.1}Plan de Verificación y Corrección Global}{29}{}%
+\contentsline {section}{\numberline {5.2}Rendimiento de búsquedas de vecinos paralelas con centros aleatorios}{29}{}%
+\contentsline {section}{\numberline {5.3}Rendimiento de búsquedas de vecinos paralelas sobre toda la nube}{33}{}%
+\contentsline {chapter}{\numberline {6}Discusión de los resultados}{35}{}%
+\contentsline {chapter}{\numberline {7}Exemplos (eliminar capítulo na versión final)}{37}{}%
+\contentsline {section}{\numberline {7.1}Un exemplo de sección}{37}{}%
+\contentsline {subsection}{\numberline {7.1.1}Un exemplo de subsección}{37}{}%
+\contentsline {subsection}{\numberline {7.1.2}Otro exemplo de subsección}{37}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{37}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{37}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{37}{}%
+\contentsline {section}{\numberline {7.2}Exemplos de figuras e cadros}{38}{}%
+\contentsline {section}{\numberline {7.3}Exemplos de referencias á bibliografía}{38}{}%
+\contentsline {section}{\numberline {7.4}Exemplos de enumeracións}{38}{}%
+\contentsline {chapter}{\numberline {8}Conclusións e posibles ampliacións}{41}{}%
+\contentsline {chapter}{\numberline {A}Manuais técnicos}{43}{}%
+\contentsline {chapter}{\numberline {B}Manuais de usuario}{45}{}%
+\contentsline {chapter}{\numberline {C}Licenza}{47}{}%
+\contentsline {chapter}{Bibliografía}{49}{}%

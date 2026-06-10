@@ -26,15 +26,13 @@ LOCAL_REORDERS="none,polar,cartesian"
 umbral=64
 
 
-# subset searches
+# full searches
 for data in "${datasets_low_density[@]}"; do
   ./build/octrees-benchmark -i "$data" -o "$FOLDER/full" -e "hilb" --kernels "cube,sphere" -r "2.0,5.0,8.0" -s "all" --sequential --repeats 1 -a "$ALGOS_RADIUS" --local-reorder "$LOCAL_REORDERS" --max-leaf "256" --umbral-poda "$umbral"
 done
 
-# subset searches
 for data in "${datasets_mid_density[@]}"; do
   ./build/octrees-benchmark -i "$data" -o "$FOLDER/full" -e "hilb" --kernels "cube,sphere" -r "0.5,1.0,3.0" -s "all" --sequential --repeats 1 -a "$ALGOS_RADIUS" --local-reorder "$LOCAL_REORDERS" --max-leaf "128" --umbral-poda "$umbral"
-
 done
 
 for data in "${datasets_high_density[@]}"; do

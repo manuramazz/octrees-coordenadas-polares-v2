@@ -1,3 +1,215 @@
 \chapter{Metodología}
 
-Ah shit here we go...
+En este capítulo se expone detalladamente el proceso de diseño, implementación y optimización incremental de los nuevos algoritmos de poda geométrica a nivel de nodo hoja sobre la estructura del Octree lineal. El objetivo metodológico fundamental de este estudio es romper el carácter indivisible de los nodos hoja tradicionales, acotando el espacio de búsqueda lineal mediante la aplicación de criterios analíticos basados en proyecciones cartesianas, esféricas y cilíndricas.
+
+A diferencia de un desarrollo estático, la metodología de este proyecto se ha concebido como un proceso iterativo guiado por el rendimiento. A lo largo de las siguientes secciones se describirán las técnicas utilizadas a lo largo de la evolución del software. Se partió de un modelo teórico inicial enfocado en la máxima restricción geométrica y el ahorro de memoria, pasando por el análisis de cuellos de botella computacionales hasta converger en una solución de alta localidad espacial y bajo coste de computación.
+
+\section{Fundamentos geométricos de la poda en nodos hoja}
+En esta sección se explica cómo se realiza exactamente la poda para descartar puntos dentro de hojas conflictivas. Como ya se ha visto anteriormente, es sencillo conseguir los valores de coordenadas esféricas o cilíndricas a partir de coordenadas cartesianas tridimensionales. Para cada propiedad que las define, se puede delimitar unos valores máximo y mínimo que un punto puede tener para que, dado un kernel de búsqueda definido, pueda estar dentro de ese kernel de vecindad, de forma que si no tiene un valor fuera de ese intervalo se descartará automáticamente. Lo interesante de esta cuestión es no tener que calcular esos valores uno a uno, eso es exactamente lo que hacen los algoritmos originales. Lo que convierte este cálculo en un algoritmo eficiente es ordenar los puntos, de forma independiente en cada hoja, según cada una de esas claves en la inicialización de la estructura. De esta forma, basta con encontrar los puntos que suponen el límite inferior y superior del intervalo y se tiene automáticamente el conjunto de puntos a evaluar, descartando el resto. La eficiencia de esta técnica depende de dos factores fundamentales: la efectividad directa de la poda, es decir, el porcentaje de puntos descartados, que debe ser lo mayor posible; y la reducción de la sobrecarga en el cálculo, debiendo evitar que el coste de definir los índices sobre los que buscar no supere el coste de rechazar los puntos descartados uno a uno, tal y como se estaba haciendo.
+
+A continuación se detalla como se definen los valores máximos y mínimos para cada propiedad posible del punto. Una consideración a tener es que este proceso no es único de las coordenadas polares, se puede tomar la misma técnica con los valores de los ejes X, Y, Z. De hecho, es \textit{a priori} una buena opción ya que se evitan las operaciones de transformación de sistema de coordenadas, por lo que es una estrategia que se tendrá en cuenta. En la Figura \ref{fig:cart_preview} se puede ver una simulación gráfica de cómo se realiza la poda en el espacio de 3 dimensiones, en este caso usando el eje X para la poda. El cubo negro representa la hoja del Octree mientras que el azul representa el kernel de búsqueda cúbico, con el punto de búsqueda en su centro. La zona cortada por el hiperplano que queda en el interior de la hoja es la única zona donde puede haber vecinos, sea la distribución que sea.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\textwidth]{figuras/metodologia/poda_octree_cartesiana_x.png} 
+    \caption{Funcionamiento de la poda en un espacio tridimensional usando  ejes cartesianos.}
+    \label{fig:cart_preview}
+\end{figure}
+
+El cálculo matemático de los límites de búsqueda es directo si se traslada el origen al centro de la hoja del Octree. Dado un punto de búsqueda $Q = (q_x, q_y, q_z)$ y un radio de búsqueda $r_k$ para cada eje $k \in \{X, Y, Z\}$ (ya sea una esfera o un cubo), un punto cualquiera $P = (p_x, p_y, p_z)$ perteneciente a dicha hoja se considera un candidato potencial a vecino si y solo si sus coordenadas satisfacen la siguiente condición para el componente $k \in \{X, Y, Z\}$ que está siendo estudiado:
+
+\[\quad p_k \in [q_k - r_k, \quad q_k + r_k] \]
+
+Lo cual equivale a la restricción de vecindario por componentes dada por el valor absoluto:
+
+\[ |p_k - q_k| \le r_k \]
+
+Aquí se debe realizar un apunte. La restricción real para que un punto de búsqueda $Q = (q_x, q_y, q_z)$ sea vecino es la agregación de la restricción anterior para todas sus componentes:
+\[ \forall k \in \{X, Y, Z\}, \quad p_k \in [q_k - r_k, \quad q_k + r_k] \]
+
+Sin embargo, de esta forma no se pueden hacer ordenaciones y habría que hacer intersecciones de rangos para hallar los puntos candidatos. Esto eliminaría el objetivo de la optimización, evitar tener que comprobar puntos uno a uno, además de eliminar la localidad y suponer una sobrecarga demasiado grande. Por estos motivos se trabajará con las propiedades de los puntos de forma separada para la extracción de rangos.
+
+
+
+De forma análoga, es posible determinar analíticamente los límites inferiores y superiores para las variables de los sistemas de coordenadas alternativos. Dado un punto de búsqueda $Q = (q_x, q_y, q_z)$ y un radio de consulta $r$, se debe realizar una consideración previa cuando se emplean entornos volumétricos ortogonales: en el caso del kernel cúbico, para garantizar que ningún candidato potencial quede excluido y no sobreestimar las condiciones de vecindad, se toma como radio efectivo el de la esfera mínima circunscrita que lo envuelve completamente, el cual se define formalmente como $r_{\text{efectivo}} = r\sqrt{3}$.
+
+En el marco del sistema de \textbf{coordenadas esféricas}, la evaluación del ángulo azimutal $\varphi$ (cuyo dominio se restringe al intervalo $[-\pi, \pi)$) se estructura a partir de la proyección del punto de búsqueda en el plano $xy$. Se define la distancia de la \textit{query} al origen como $\rho_q = \sqrt{q_x^2 + q_y^2}$. El ángulo azimutal del punto de búsqueda se calcula mediante la función arcotangente de dos parámetros como $\varphi_q = \text{atan2}(q_y, q_x)$.
+
+Geométricamente, la máxima desviación angular posible que puede tener un vecino a una distancia horizontal $\rho_q$ viene acotada por las tangentes a la esfera de búsqueda. Por lo tanto, el intervalo de tolerancia angular dentro del cual debe encontrarse un punto para optar a ser vecino se define como:
+\[ \Phi = [\varphi_q - \Delta\varphi, \quad \varphi_q + \Delta\varphi] \]
+
+Donde el semiángulo de apertura $\Delta\varphi$ se deduce de la relación trigonométrica:
+\[ \Delta\varphi = \arcsin\left(\frac{r}{\rho_q}\right) \]
+
+Continuando con el sistema de \textbf{coordenadas esféricas}, la segunda componente angular a evaluar corresponde al ángulo de coaltitud o ángulo polar $\theta$, cuyo dominio físico se restringe al intervalo $[0, \pi]$. Este ángulo describe la desviación respecto al eje de ordenadas $Z$ y se calcula analíticamente a partir de la distancia euclídea tridimensional al origen, definida como $r_q = \sqrt{q_x^2 + q_y^2 + q_z^2}$, mediante la relación:
+\[ \theta_q = \arccos\left(\frac{q_z}{r_q}\right) \]
+
+De manera homóloga al análisis azimutal, la dispersión angular máxima para los candidatos a vecinos en esta dimensión se encuentra acotada por el contorno de la esfera de búsqueda de radio $r$. Por consiguiente, el intervalo de aceptación para el ángulo polar se establece como:
+\[ \Theta = [\theta_q - \Delta\theta, \quad \theta_q + \Delta\theta] \]
+
+Donde la apertura angular crítica $\Delta\theta$ se deriva directamente como:
+\[ \Delta\theta = \arcsin\left(\frac{r}{r_q}\right) \]
+
+No obstante, existe una condición geométrica singular para estas dos componentes angulares que hace automáticamente nula la poda y permite mitigar el coste computacional al eludir el cálculo de funciones trigonométricas inversas, de alto coste en CPU. La estrategia de poda es estéril si se satisface la relación:
+\[ r \ge r_q \quad (\text{o } r \ge \rho_q \text{ en el plano } xy) \]
+
+La naturaleza de esta restricción radica en que, si el radio de consulta es mayor o igual a la distancia del punto de búsqueda al origen, el volumen del kernel contiene de forma implícita dicho origen. En consecuencia, el espacio de búsqueda abarca todas las direcciones del espacio y por lo tanto todo el dominio de valores angulares, imposibilitando cualquier restricción angular efectiva.
+
+Por último, la cota asociada a la componente radial tridimensional $r_p$ de cualquier punto candidato $P$ para el filtrado en esféricas es directa, obligando al punto a posicionarse dentro del rango de distancias determinado por:
+\[ R_{\text{esférico}} = [r_q - r, \quad r_q + r] \]
+
+En contraposición, cuando el análisis se reduce a un sistema de \textbf{coordenadas cilíndricas}, la componente radial se evalúa de forma bidimensional. La distancia proyectada de la \textit{query} se define como $\rho_q = \sqrt{q_x^2 + q_y^2}$, y el criterio de vecindad para la magnitud del radio cilíndrico $\rho_p$ de los puntos de la hoja se simplifica al intervalo:
+\[ R_{\text{cilíndrico}} = [\rho_q - r, \quad \rho_q + r] \]
+
+En la Figura~\ref{fig:polar_preview} se ilustra un ejemplo de mecanismo de poda en el espacio tridimensional, empleando en este caso el ángulo azimutal $\varphi$. Como se observa, el algoritmo traza dos hiperplanos orientados según los límites angulares calculados, descartando inmediatamente cualquier punto cuyos límites geométricos queden completamente fuera del sector angular $\Phi$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/metodologia/poda_octree_polar.png} 
+    \caption{Funcionamiento de la poda en un espacio tridimensional usando coordenadas esféricas/cilíndricas.}
+    \label{fig:polar_preview}
+\end{figure}
+
+\section{Primera Fase de Implementación: Selectores de rango polares y vectores de permutaciones}
+Las decisiones de diseño iniciales se caracterizaron por buscar un equilibrio entre la minimización de la sobrecarga en memoria introducida y en maximizar la cuota de puntos podados.
+Un trabajo inicial que hubo que realizar fue exponer una serie de funciones en la clase del Octree lineal para poder operar a nivel de hoja con comodidad. Estas funciones dan acceso a una serie de vectores que contienen los centros de las hojas y pares de índices que indican el inicio y el final de los puntos de la hoja en la estructura original del Octree, así como una función que devuelve el número total de hojas.
+Una vez integradas estas funciones preliminares, la primera parte de la implementación es construir el reordenamiento de puntos a nivel de hoja. Esto se hace a la hora de inicializar la estructura y las operaciones solo se llevan a cabo una vez al cargar la nube de puntos, por lo que la eficiencia temporal no es una gran preocupación. Sí lo puede ser, sin embargo, el consumo de memoria. Por eso la primera aproximación fue la de crear vectores de permutaciones. La utilidad de estos es almacenar, dentro de una hoja, el índice global de los puntos en orden creciente siguiendo una clave concreta de las analizadas en la sección anterior. Para ordenar cada vector se usó la función \texttt{std::sort}, con complejidad temporal $\mathcal{O}(N \log(N))$.
+Así, para acceder, por ejemplo, al punto con el radio esférico menor de la hoja $i$ bastaría con acceder a \texttt{points[permsRadius[i][0]]} siendo \texttt{points} el array de puntos originales. El beneficio de este método es que cada elemento es un \texttt{size\_t} y ocupa 8 bytes frente a los 32 bytes que ocupa un objeto de la clase \texttt{Point}.
+Por otro lado, se diseñó la técnica de selección de rango. Esta funcionalidad está pensada para ser ejecutada una vez por cada ocasión en la que se llegue a una hoja conflictiva durante una búsqueda, por lo que se ejecutará miles de veces por ejecución y será trascendental buscar la máxima eficiencia temporal, a la vez que se debe conseguir una poda lo mejor posible. Este equilibrio a buscar es el factor más decisivo a la hora de enfocar el diseño de esta función. Este módulo debe devolver los rangos mínimo y máximo para examinar de la hoja que se está evaluando. En ella se hacen los cálculos matemáticos descritos en la anterior sección para conseguir los límites numéricos y a continuación se lleva a cabo una búsqueda binaria sobre los puntos reordenados de la hoja para transformar los valores en el intervalo de índices correspondiente, por lo que la complejidad del selector es $\mathcal{O}(\log_2N)$, aparte de la sobrecarga introducida por los cálculos matemáticos.
+ 
+Se implementaron de salida dos modos de reordenamiento independientes, uno usando las características de un punto según coordenadas esféricas y otro según coordenadas cilíndricas. Se hizo de esta manera porque no tiene sentido mezclar claves de ambos sistemas en una única búsqueda: Las podas que se pueden realizar con coordenadas esféricas son por definición más restrictivas que las que se pueden hacer con el sistema cilíndrico. La poda por el ángulo $\varphi$ es directamente la misma. La poda que el ángulo $\theta$ lleva a cabo se define por la posición en el eje Z del punto de búsqueda, pero es más estricta que podar directamente en base al valor de Z (la ventaja del sistema cilíndrico aquí es que puede podar casos en los que el kernel cubra el centro). Por último, el radio tridimensional es más estricto que el radio en el plano $XY$. En conclusión, las coordenadas esféricas consiguen un rango más estricto mientras que las coordenadas cilíndricas son algo menos costosas computacionalmente. Esto hace que no tenga sentido mezclar los sistemas en las búsquedas, y proponen una comparativa interesante a estudiar entre los dos modos. Se añadió como parámetro de entrada el parámetro \texttt{--local-reorder}, que podía tomar uno o varios valores de entre los siguientes: \texttt{[none,spherical,cylindrical]}
+Una vez tomada la decisión de separar las reordenaciones esféricas y cilíndricas se definieron los detalles de la estrategia en la selección de rango, que fue la siguiente:
+\begin{enumerate}
+    \item Se investigan las tres posibles reordenaciones para el sistema de coordenadas elegido. Para cada clave:
+    \begin{enumerate}
+        \item Se calculan los valores límite tal y como se expuso anteriormente.
+        \item Se traducen los valores a índices mediante la búsqueda binaria.
+    \end{enumerate}
+    \item Al finalizar el bucle, se comprueba qué clave deja un rango más pequeño a examinar.
+    \item Se devuelve un código que se asocia con el reordenamiento elegido, los índices mínimo y máximo y el vector de permutaciones correspondiente.
+\end{enumerate}
+
+
+\section{Análisis de Cuellos de Botella y Rediseño del Sistema}
+Una vez terminada la implementación e integración de la versión base de la poda, se llevaron a cabo unas pruebas preliminares para poder tener una primera referencia de su desempeño. Los resultados fueron negativos para diferentes tipos de nubes, por lo que hubo que pasar por un proceso de análisis exhaustivo para encontrar las causas y soluciones del mal rendimiento de la implementación de las podas con respecto a los algoritmos base. Para conocer la efectividad de la poda en sí se introdujo el modo de debug en el programa, con el que se exportan a un archivo información de cada hoja conflictiva a la que se llega. Se imprime qué modo de reordenamiento se está usando (cilíndrico o esférico), qué clave concreta fue mejor y por tanto se usó en esa hoja, el número de puntos de la hoja y el número de puntos restantes después de la poda. Con esta información se llevó a cabo un estudio de la efectividad de la poda sobre un pequeño conjunto de nubes que dio lugar a los resultados mostrados en el Cuadro \ref{tab:rangos1}. También se analizó el éxito de cada clave de reordenamiento, cuyos resultados se recogen en las Figuras \ref{fig:claves1} y \ref{fig:claves2}.
+
+
+\begin{table}[H]
+\centering
+\label{tab:rangos1}
+\begin{tabular}{llc@{\hspace{1.5em}}cccccc}
+\toprule
+ & & & \multicolumn{2}{c}{\textbf{Paris-Lille}} & \multicolumn{2}{c}{\textbf{sg\_27\_station}} & \multicolumn{2}{c}{\textbf{Lille\_0}} \\
+\cmidrule(r){4-5} \cmidrule(r){6-7} \cmidrule(r){8-9}
+\textbf{Reordenamiento} & & \textbf{Radio ($r$)} & Cubo & Esfera & Cubo & Esfera & Cubo & Esfera \\
+\midrule
+\multirow{4}{*}{Cilíndrico} & & 0.5 & 13.8\% & 37.0\% & 39.2\% & 51.9\% & 5.2\% & 28.2\% \\
+                            & & 1.0 &  8.5\% & 28.8\% &  6.4\% & 33.3\% & 6.1\% & 28.4\% \\
+                            & & 2.0 &  7.0\% & 26.0\% &  3.6\% & 31.7\% & 12.4\% & 33.5\% \\
+                            & & 3.0 &  6.7\% & 23.9\% &  2.4\% & 32.2\% & 17.2\% & 39.1\% \\
+\midrule
+\multirow{4}{*}{Esférico}   & & 0.5 &  9.3\% & 38.7\% & 22.3\% & 48.6\% & 2.8\% & 32.3\% \\
+                            & & 1.0 &  3.9\% & 32.6\% &  6.2\% & 36.2\% & 3.8\% & 32.4\% \\
+                            & & 2.0 &  2.6\% & 31.4\% &  3.5\% & 33.8\% & 9.2\% & 35.5\% \\
+                            & & 3.0 &  1.4\% & 30.8\% &  2.3\% & 34.2\% & 13.8\% & 40.1\% \\
+\bottomrule
+\end{tabular}
+\caption{Porcentaje de puntos podados según el tipo de reordenamiento, geometría del kernel y radio de búsqueda ($r$) para las nubes analizadas.}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figuras/metodologia/clavesSphe.png} 
+    \caption{Distribución de claves óptimas por hoja en modo esférico sobre la nube sg27\_station\_8}
+    \label{fig:claves1}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figuras/metodologia/clavesCyl.png} 
+    \caption{Distribución de claves óptimas por hoja en modo cilíndrico sobre la nube sg27\_station\_8}
+    \label{fig:claves2}
+\end{figure}
+
+De estos datos se pueden extraer varios aprendizajes. En primer lugar, las podas con kernel cúbico tienen una efectividad prácticamente nula debido a la sobreestimación que hay que realizar, lo cual probablemente provoque que para la mayoría de hojas el kernel cubra el centro o incluso la hoja entera. Ese porcentaje que se ahorra, de entre el 5 y el 10\% de las hojas, no compensa para nada la sobrecarga introducida y el gasto en memoria. También se aprecia un comportamiento a tener en cuenta de aquí en adelante, y es que cuánto más pequeño sea el radio, más efectiva será la poda de forma general. Esto ocurre así porque la sección angular que cubre una esfera, estando a la misma distancia siempre del centro, es proporcional al tamaño de esta, y esferas pequeñas se pueden encerrar en regiones muy estrechas. Por último, en las Figuras \ref{fig:claves1} y \ref{fig:claves2} hay un patrón muy claro. La clave que mejor funciona con mucha diferencia es el ordenamiento por ángulo $\varphi$, seguido de lejos por la coordenada $Z$.
+
+Este estado de conocimiento dio pie a una serie de optimizaciones y rediseños que fueron aplicados sobre los algoritmos.
+
+\section{Segunda Fase de Implementación: Refactorización y Simplificación de Modelos}
+Tras analizar los resultados preliminares, se tomaron una serie de cambios en el enfoque de las podas. Los principales problemas a arreglar eran la inefectividad con el kernel cúbico y la excesiva sobrecarga en proporción a la magnitud de hojas podadas.
+
+Dada la dominancia del ángulo $\varphi$ para los reordenamientos, se decidió usar solo esa clave de aquí en adelante. Esta decisión tiene una desventaja, y es que se quedarán sin podar hojas que quizás con el ángulo de coaltitud o el radio sí descartarían puntos. Pero las ventajas son un gran ahorro en memoria, teniendo en cuenta que también se eliminan los dos modos separados de coordenadas esféricas y cilíndricas, y un gran ahorro en la sobrecarga de la selección de rangos. El funcionamiento de la selección de rango en las búsquedas ahora simplemente consiste en calcular los valores límites angulares en el domimio $[-\pi, \pi )$, realizar la búsqueda binaria para encontrar el rango de puntos en la hoja y devolver el rango junto con el vector de permutaciones necesario para efectuar la búsqueda. Cabe destacar, eso sí, un condicional implementado a mayores. El dominio de valores es circular, es decir, que un kernel puede soportar un rango del tipo $[x, \pi ), [-\pi, y]$. Se incluyó esta posibilidad devolviendo dos pares de índices e incluyendo un nuevo condicional en los algoritmos de búsqueda, que recorren el segundo intervalo de puntos en caso de ser necesario.
+
+En este punto se tomó la decisión de implementar otro tipo de reordenamiento, de forma que hubiese dos modos independientes de nuevo. En este caso, se usarían los valores de los ejes de coordenadas $X,Y,Z$ para hacer los reordenamientos a nivel de hoja, de forma que habría 3 posibles claves, al igual que en el primer algoritmo propuesto. Sin embargo, en este caso hay una serie de ventajas que hacen esta implementación mucho más atractiva. Para empezar, los valores cartesianos ya están definidos en los puntos, no hay que hacer cálculos a mayores para transformar las coordenadas y posteriormente ordenar los puntos. Además, el cálculo de límites es extremadamente rápido. Tal y como se detalló en la sección 4.1, no es más que una suma/resta. A mayores, se espera que este formato arregle el problema presente en los resultados de poda obtenidos de la dependencia al tamaño del radio. Los ejes cartesianos pueden podar cualquier sección de la hoja, mientras que el efecto del ángulo azimutal se anula cuando el kernel sobrepasa el centro de la hoja. Por último, hay una nueva optimización sobre la selección de rango posible para este caso. El cálculo de la región entre los valores límites es trivial y nada costosa, por lo que se puede usar como referencia para determinar cuál es el eje que más puntos desecha y se elimina la necesidad de ejecutar las búsquedas binarias por partida triple. Dado que no se asegura una distribución uniforme de los puntos, este método no asegura que se esté escogiendo la clave óptima siempre, pero es una aproximación muy eficiente temporalmente y no se espera una pérdida significativa en efectividad de poda.
+
+Por tanto, se llevo a cabo la refactorización, unión y simplificación del algoritmo de poda basado en coordenadas esféricas/cilíndricas (modo de reordenamiento polar de aquí en adelante) y se implementó el modo basado en coordenadas ordenadas (modo cartesiano de aquí en adelante). La implementación de las funciones de selección de rango y algoritmos de búsqueda se hizo en funciones separadas para aumentar el desacoplamiento y evitar la ejecución de condicionales en tiempos de ejecución.
+
+\section{Construcción de réplicas contiguas e integración en el flujo de búsqueda del Octree}
+En paralelo a la implementación de los nuevos modos polar y cartesiano, se analizó y diseñó otra optimización temporal, basada esta vez en la localidad de memoria durante el bucle de búsqueda. Hasta ahora, las reordenaciones se estaban haciendo mediante vectores de permutaciones, lo que provocaba accesos a memoria extra en relación al algoritmo base. En las Figuras \ref{alg:busqueda_base} y \ref{alg:busqueda_reordenada} vemos una comparación entre el bucle base y el modificado para poder recorrer el intervalo podado mediante indirecciones para el algoritmo \texttt{neighborsPrune}:
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.47\textwidth}
+\begin{algorithmic}[1]
+\Require $\mathit{leafStart}, \mathit{leafEnd}, \mathit{points}, k$
+\Ensure $\mathit{ptsInside}$
+\Statex
+\For{$i = \mathit{leafStart} \text{ \textbf{to} } \mathit{leafEnd} - 1$}
+    \If{$k.\text{isInside}(\mathit{points}[i])$}
+        \State $\mathit{ptsInside}.\text{push\_back}(i)$
+    \EndIf
+\EndFor
+\end{algorithmic}
+\caption{Búsqueda base (Acceso secuencial).}
+\label{alg:busqueda_base}
+\end{minipage}
+\hfill
+\begin{minipage}{0.49\textwidth}
+\begin{algorithmic}[1]
+\Require $\mathit{rangeStart}, \mathit{rangeEnd}, \mathit{points}, \mathit{perms}, k$
+\Ensure $\mathit{ptsInside}$
+\Statex
+\For{$i = \mathit{rangeStart} \text{ \textbf{to} } \mathit{rangeEnd}-1$}
+    \If{$k.\text{isInside}(\mathit{points}[\mathit{perms}[i]])$}
+        \State $\mathit{ptsInside}.\text{push\_back}(\mathit{perms}[i])$
+    \EndIf
+\EndFor
+\end{algorithmic}
+\caption{Búsqueda reordenada (Acceso indexado).}
+\label{alg:busqueda_reordenada}
+\end{minipage}
+\end{figure}
+
+El objetivo es poder aplicar el bucle \ref{alg:busqueda_base} a la vez que las podas a nivel de hoja. Para conseguirlo, es necesario hacer una réplica del  vector de puntos de forma que cada hoja empiece en el mismo índice, para mantener la coherencia con la parte exterior del algoritmo, pero estando los puntos reordenados a nivel de hoja. Esta decisión introduce un gasto mayor en memoria, pero se asume teniendo en cuenta que el objetivo principal del trabajo es encontrar eficiencia temporal y que hasta ahora los resultados no habían sido positivos, además de que con la simplificación de los algoritmos de selección de rangos ya se hizo un ahorro de memoria sobre la versión inicialmente planteada. De esta forma, después de la construcción de la estructura, se intercambia la creación de los vectores persistentes de permutaciones por duplicaciones de \texttt{points} con reordenamientos incluidos a nivel de hoja.
+
+En el caso del modo polar, este cambio funcionó de manera correcta. El formato del bucle de búsqueda es el mismo. Los índices guardados en el almacén de vecinos \texttt{ptsInside} hacen referencia al vector de reordenamiento polar \texttt{polarPoints}. La única diferencia es que en este modo se incluye el bucle condicional sobre el segundo rango que se recorrerá en caso de existir, tal y como se expuso en la sección 4.4.
+
+Sin embargo, en el modo cartesiano la búsqueda no es tan sencilla. Se están mezclando tres vectores de reordenamiento diferentes en diferentes hojas de la misma búsqueda. Por tanto hay que recuperar un puntero al inicio de la hoja de uno de ellos dependiendo de cuál produjese la mejor poda. Aparte de esa pequeña sobrecarga, hay un problema mayor a la hora de incluir los índices en el almacén de vecinos. No se pueden añadir mediante la forma \texttt{push\_back(i)} porque una vez terminada la búsqueda, a la hora de acceder y reconstruir los vecinos, sería imposible saber a qué vector apunta cada índice. 
+
+La solución que se adoptó fue usar el campo \texttt{id} existente en la estructura \texttt{Point}. En ella, a la hora de construir los vectores reordenados, se incluyeron las posiciones originales de cada punto. De esta forma, durante el bucle se insertan los puntos accediendo a la función \texttt{id()} del punto, una función \textit{getter} del campo. La ineficiencia de este acceso extra existe, pero teniendo en cuenta que es una función \textit{inline} y que el objeto \texttt{Point} fue accedido justo antes y debería estar en caché, es la mejor solución posible ante el problema planteado.
+
+Esta explicación, sin embargo, solo aplica al algoritmo \texttt{neighborsPrune}. El algoritmo \texttt{neighborsStruct} incluye una forma de almacenado de vecinos basada en pares de índices, como se aprecia en la siguiente Figura \ref{alg:struct}. 
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.82\textwidth}
+\begin{algorithmic}[1]
+\Require $\mathit{leafStart}, \mathit{leafEnd}, \mathit{points}, k$
+\Ensure $\mathit{ptsInside}$
+\Statex
+\State $\mathit{rangeStart} \gets leafStart$
+\For{$i = \mathit{leafStart}  \text{ \textbf{to} } \mathit{leafEnd} - 1$}
+    \If{$\neg \, k.\text{isInside}(\mathit{points}[i])$}
+        \If{$\mathit{rangeStart} < i$}
+            \State $\mathit{result}.\text{addRange}(\mathit{rangeStart}, i)$
+        \EndIf
+        \State $\mathit{rangeStart} \gets i + 1$
+    \EndIf
+\EndFor
+\end{algorithmic}
+\caption{Búsqueda base para el algoritmo neighborsStruct.}
+\label{alg:struct}
+\end{minipage}
+\end{figure}
+
+Nuevamente, el modo polar aplica exactamente la misma lógica que las búsquedas originales, por lo que la adaptación a este algoritmo es trivial. Por otra parte, hasta donde se analizó, no es posible la adaptación del modo cartesiano. Los rangos en un vector de reordenamiento concreto se corresponden con puntos aleatoriamente distribuidos en el vector \texttt{Points}, por lo que es imposible hacer una inserción de vecinos mediante rangos.
+
+Para terminar el capítulo de implementación, cabe mencionar que se introdujo un parámetro personalizable \texttt{threshold} al programa. Su función es impedir que la sobrecarga de selecciones de rango sea mayor al tiempo ahorrado en el bucle de búsqueda. Por tanto, cualquier hoja con $N_{puntos} < threshold$ será recorrida de forma secuencial.

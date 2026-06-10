@@ -1,2 +1,100 @@
 \chapter{Pruebas}
+En este capítulo se expondrán los experimentos ejecutados en el CESGA y los resultados obtenidos. El experimento se divide en dos secciones: el análisis principal, el de tiempos de ejecución, y un análisis de escalabilidad de paralelización. Los experimentos de tiempos de ejecución se dividen a su vez en búsquedas de subconjuntos con centros aleatorios y en búsquedas de nubes completas.
+
+\section{Plan de Verificación y Corrección Global}
+Como paso previo e indispensable al análisis de rendimiento, se diseñó un script de pruebas unitarias automatizadas para verificar la fidelidad de los nuevos algoritmos orientados a la poda en nodos hoja. Para cada una de las configuraciones evaluadas en este capítulo, se contrastaron los resultados de vecindad devueltos por las variantes optimizadas frente a los resultados reportados por la implementación base del Octree lineal clásico. La verificación produjo una coincidencia del 100\%, por tanto se pasó al estudio de los resultados temporales, con la garantía de que en las podas se descartan únicamente regiones del espacio geométrico disjuntas al kernel.
+
+\section{Rendimiento de búsquedas de vecinos paralelas con centros aleatorios}
+Estos experimentos exploran la eficiencia temporal en la ejecución de un lote de 10.000 consultas espaciales con centros distribuidos aleatoriamente. Cada configuración se repitió 5 veces, tomando como métrica el tiempo medio de ejecución. Cabe destacar que se empleó una paralelización a escala de 40 núcleos en todas las ejecuciones. Se usaron todas las nubes de puntos descritas en el apartado 3.4, variando los siguientes hiperparámetros:
+\begin{itemize}
+    \item \textbf{Modo de reordenamiento}. Se probaron tanto los dos modos implementados como la versión base secuencial, teniendo una comparación directa con el rendimiento anterior del programa.
+    \item \textbf{Algoritmo de búsqueda}. Se sometieron a pruebas los dos métodos estudiados y modificados:\textit{neighborsPrune} y \textit{neighborsStruct} .
+    \item  \textbf{Kernel}. Los dos kernels en tres dimensiones soportados: cubo y esfera.
+    \item  \textbf{Algoritmos de SFC}. Se usaron tanto los códigos de Morton como los de Hilbert. Sin embargo, no se analizaron los resultados por separado, eso está fuera del alcance del trabajo. Se incluyeron para promediar los resultados con los dos \textit{encoders} y tener una visión más contrastada de los resultados.
+    \item  \textbf{Radio}. Se dividieron las nubes en tres grupos: de densidad alta, media y baja, según la naturaleza de la nube. Para cada grupo se ejecutó una selección de 8 radios distintos adaptada a la cantidad de vecinos aproximada que producirán.
+    \item \textbf{Tamaño de hoja (número máximo de puntos)}. Este parámetro es de los más críticos para este trabajo. Puede influir directamente en el rendimiento temporal de la poda. Se probaron valores de $128, 256, 512, 1024$
+    \item \textbf{Umbral de poda (threshold)}. Parámetro dedicado de esta optimización. Puede presentar cambios en el rendimiento, midiendo en qué punto deja de ser rentable o no el algoritmo de poda. Se probaron valores de $16, 64, 100$
+\end{itemize}
+
+A continuación, se muestran los resultados obtenidos. Para empezar, se visualiza el tiempo de ejecución medio, dado un radio y una geometría de búsqueda, de cada combinación de algoritmo y reordenación local para diferentes tamaños de hoja. En las Figuras \ref{fig:subset_barras_dales} y \ref{fig:subset_barras_bild} se ven los resultados variando el radio y la nube de puntos usada.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/subset/dales_r2.png} 
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/subset/dales_r6.png} 
+    \caption{Tiempos medios de búsqueda de vecindades de 10.000 puntos aleatorios tomando diferentes radios en \textit{5085\_54320}}
+    \label{fig:subset_barras_dales}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/subset/bild_r0025.png} 
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/subset/bild_r01.png} 
+    \caption{Tiempos medios de búsqueda de vecindades de 10.000 puntos aleatorios tomando diferentes radios en \textit{bildstein\_station1}}
+    \label{fig:subset_barras_bild}
+\end{figure}
+
+Tal y como se evidencia en las Figuras \ref{fig:subset_barras_dales} y \ref{fig:subset_barras_bild} , los mínimos absolutos de tiempo se alcanzan de manera consistente al configurar un tamaño de nodo hoja fijado en \texttt{256}. Asimismo, destaca la superioridad del algoritmo \textit{neighborsStruct}. Aislando sus dos versiones, las implementaciones que incorporan reordenaciones locales y selectores de rango reportan una aceleración notable del tiempo de ejecución respecto al algoritmo original del Octree lineal, especialmente  kernels esféricos. En cuanto a los resultados de \textit{neighborsPrune}, en general están alejados, pero tanto el reordenamiento polar como el cartesiano tienen un desempeño similar, en casos superior, al algoritmo base. Comparándolos entre ellos, ninguno de los dos reordenamientos aplicados a \textit{neighborsPrune} destaca enormemente sobre el otro.
+Una tendencia que sí se puede apreciar es que los reordenamientos mantienen el rendimiento de forma más estable a medida que se disparan los tamaños de las hojas, contrastando con la degradación en los tiempos que sufren las implementaciones originales.
+
+Seguidamente, se analiza el impacto combinado de las dos variables de control críticas en el rendimiento de la poda: el tamaño máximo de nodo hoja (\texttt{maxLeaf}) frente al umbral de activación del selector (\texttt{threshold}). Para aislar el efecto del resto de parámetros, ambas variables se contraponen en una matriz bidimensional. 
+
+El valor indexado en cada celda de la matriz corresponde a la media aritmética del \textit{speedup} ($S$) obtenido para el conjunto de radios evaluados. Para evitar que los radios con mayores tiempos absolutos sesguen el mapa de calor, el \textit{speedup} de cada radio $r$ se normaliza dividiendo el tiempo de la configuración actual entre el tiempo mínimo absoluto registrado para ese mismo radio entre todo el espectro de hiperparámetros testados. Finalmente, este indicador se promedia combinando los resultados de ambos kernels de búsqueda (cubo y esfera), respondiendo a la siguiente expresión:
+
+\begin{equation}
+    S_{\text{medio}} = \frac{1}{|K| \cdot |R|} \sum_{k \in K} \sum_{r \in R} \frac{T_{\text{optimo}}(k)}{T(k, r, \texttt{maxLeaf}, \texttt{threshold}, \texttt{algoritmo})}
+\end{equation}
+
+\begin{figure}[htbp]
+    \centering
+    % Primera gráfica (Izquierda)
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figuras/subset/heatmap_18train.png}
+        \label{fig:heatmapTrain}
+    \end{subfigure}
+    \hfill 
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figuras/subset/heatmap_18test.png}
+        \label{fig:heatmapTest}
+    \end{subfigure}
+    \caption{Análisis del rendimiento temporal de hiperparámetros en las nubes de puntos \textit{Mar18Train} y \textit{Mar18Test}}
+    \label{fig:heatmapsHiperparámetros}
+\end{figure}
+
+Debido a que la reordenación polar en conjunto con las búsquedas mediante \textit{neighborsStruct} fue la más eficiente, será esa configuración en la que se centrará el estudio de hiperparámetros. Como se puede apreciar en la Figura \ref{fig:heatmapsHiperparámetros},  la combinación más eficiente para el comportamiento del Octree en las nubes del dataset \textit{Hessigheim 3D} se produce con hojas de \texttt{256} puntos y con un umbral de activación de poda (\texttt{threshold}) fijado en \texttt{16} puntos. 
+
+No obstante, distintas distribuciones de puntos en cada dataset provocan que las combinaciones óptimas presenten ligeras variaciones según la nube de puntos analizada. Por este motivo, se evaluó de forma independiente qué par de hiperparámetros favorecía el rendimiento de cada entorno específico. 
+
+Estas configuraciones óptimas personalizadas constituyen las bases de datos con las que se alimentaron los resultados a continuación expuestos. En dichos gráficos se cuantifica el tiempo medio de ejecución de las 10.000 consultas espaciales a medida que se incrementa el radio de búsqueda de forma continua, distribuyendo cada serie como una combinación única de algoritmo de asignación y modo de reordenamiento local. Se pueden ver los resultados para diferentes nubes de puntos en las Figuras (1) a (ultima) NO SE SI PONER TODAS LAS GRAFICAS AQUI O UNA SUPER TABLA O QUE.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/subset/lines_18train.png} 
+    \caption{Tiempos medios de búsqueda de vecindades de 10.000 puntos aleatorios para diferentes radios en la nube \textit{Mar18\_Train}}
+    \label{fig:subset_lines_train}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/subset/lines_18test.png}  
+    \caption{Tiempos medios de búsqueda de vecindades de 10.000 puntos aleatorios para diferentes radios en la nube \textit{Mar18\_Test}}
+    \label{fig:subset_lines_test}
+\end{figure}
+
+\section{Rendimiento de búsquedas de vecinos paralelas sobre toda la nube}
+Estos experimentos tratan un caso de uso muy común en el manejo de nubes de puntos 3d, la búsqueda de vecinos a lo largo de todo el conjunto. Estos experimentos se pueden comportar de forma diferente a las búsquedas aleatorias debido a que, al realizar las búsquedas de forma secuencial y asignar a cada hilo un bloque de puntos consecutivos, es probable que muchos puntos compartan vecinos y por tanto habrá más aciertos caché. \textit{A priori}, este factor no debería impactar tanto en el rendimiento de las reordenaciones locales, como lo hace al variar las implementaciones del Octree o las curvas de llenado utilizadas. Aún así, puede presentar un comportamiento distinto y es interesante analizarlo. Debido a lo costosas que son estas ejecuciones, se seleccionaron un subconjunto de las nubes preparadas, manteniendo variedad entre LiDAR terrestre y aéreo provenientes de diversos datasets. También se mantuvieron fijos los hiperparámetros de \texttt{maxLeaf} y \texttt{threshold}. Se escogió para cada conjunto de nubes los siguientes pares de valores, que funcionaron bien para ese conjunto concreto en los experimentos de centros aleatorios:
+\begin{itemize}
+    \item \textbf{Nubes de alta densidad}: \texttt{[256, 64]}
+    \item \textbf{Nubes de densidad media}: \texttt{[128, 64]}
+    \item  \textbf{Nubes de baja densidad}: \texttt{[256, 64]}
+\end{itemize}
+
+Adicionalmente, se fijó el algoritmo SFC a los códigos de Hilbert y se fijó una única repetición de las búsquedas.
+
+En la Tabla (tabla) se recogen todos los resultados obtenidos.
+
 

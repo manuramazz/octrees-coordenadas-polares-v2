@@ -87,16 +87,9 @@ ESTRATEGIA REFACTORIZACIÓN CÓDIGO
 
 QUÉ HACER AHORA
 -
-- Descargar nubes de Miguel
-- Moverlas a Ubuntu para probarlas
-- Subirlas a drive
-- Descargarlas desde el CESGA
-- Hablarle a Miguel sobre el algoritmo y los octrees externos. Sexo
-- Probarlas
-- Seguir con materiales (incluir nubes nuevas).
+- Mediciones de tiempos en la memoria...
 - Hablarle a Mónica.
-- Dependiendo de la respuesta: limpiar o integrar:
-- Mandar ejecuciones de reorders y parallel
+- Mandar ejecuciones parallel
 
 
 

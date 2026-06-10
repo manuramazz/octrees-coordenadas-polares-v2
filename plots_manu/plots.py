@@ -19,9 +19,11 @@ from matplotlib.colors import LightSource
 ##########################################################
 import matplotlib.ticker as mticker
 #
-def plot_pruning_points(csv_path: str, save: bool = False) -> None:
+def plot_pruning_points(csv_path: str, save: bool = False, output_dir: Path = None) -> None:
     df = pd.read_csv(csv_path)
-    dataset_name = Path(csv_path).stem
+
+    dataset_raw = Path(csv_path).stem
+    dataset_name = dataset_raw.split('-')[0]
 
     # Detectar configuración
     has_threshold = 'threshold' in df.columns
@@ -170,13 +172,13 @@ def plot_pruning_points(csv_path: str, save: bool = False) -> None:
 
             if save:
                 safe_config = config.replace(' | ', '_').replace('=', '')
-                out_path = Path(csv_path).parent / f'{dataset_name}_{mode}_{safe_config}_efficiency.png'
+                out_path = output_dir / f'{dataset_name}_{mode}_{safe_config}_efficiency.png'
                 fig.savefig(out_path, dpi=150, bbox_inches='tight')
                 print(f'Guardado: {out_path}')
             
             plt.close(fig)
 
-def plot_pruning_distribution(csv_path: str, save: bool = False) -> None:
+def plot_pruning_distribution(csv_path: str, save: bool = False, output_dir: Path = None) -> None:
     df = pd.read_csv(csv_path)
     dataset_name = Path(csv_path).stem
 
@@ -288,7 +290,7 @@ def plot_pruning_distribution(csv_path: str, save: bool = False) -> None:
             fontsize=13, fontweight='bold', y=1.02)
         plt.show()
         if (save):
-            out_path = Path(csv_path).parent / f'{dataset_name}_{mode}_pruning_distribution.png'
+            out_path = output_dir / f'{dataset_name}_{mode}_pruning_distribution.png'
             plt.tight_layout()
             plt.savefig(out_path, dpi=150, bbox_inches='tight')
             plt.close()
@@ -381,7 +383,7 @@ def plot_density_analysis(csv_path, save: bool = False) -> None:
     plt.close(fig)
 
 
-def plot_key_distribution(csv_path: str, save: bool = False) -> None:
+def plot_key_distribution(csv_path: str, save: bool = False, output_dir: Path = None) -> None:
     df = pd.read_csv(csv_path)
     dataset_name = Path(csv_path).stem
     # Detectar si hay columnas de configuración
@@ -473,7 +475,7 @@ def plot_key_distribution(csv_path: str, save: bool = False) -> None:
             fontsize=13, fontweight='bold', y=1.02)
         plt.show()
         if (save):
-            out_path = Path(csv_path).parent / f'{dataset_name}_{mode}_key_distribution.png'
+            out_path = output_dir / f'{dataset_name}_{mode}_key_distribution.png'
             plt.tight_layout()
             plt.savefig(out_path, dpi=150, bbox_inches='tight')
             plt.close()
@@ -873,7 +875,7 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
 
 def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="all", radius="all"):
     """
-    Consolida los archivos, calcula el mínimo tiempo global por radio (para normalizar en igualdad de condiciones),
+    Consolida los archivos, calcula el mínimo tiempo global por radio y kernel (para normalizar en igualdad de condiciones),
     obtiene el Speedup relativo y promedia los resultados colapsando las dimensiones de Radio y Kernel.
     Genera 3 figuras independientes por dataset para las combinaciones objetivo.
     Devuelve una lista de objetos Figure de Matplotlib.
@@ -904,12 +906,13 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
     if df_global.empty:
         return []
 
-    # --- PASO METODOLÓGICO 1: Calcular T_base (mínimo absoluto global por radio) ---
-    # Buscamos el tiempo mínimo ('mean') para cada radio sin importar kernel, operation o reorder.
-    dict_t_base = df_global.groupby('radius')['mean'].min().to_dict()
+    # --- 🛠️ CORRECCIÓN METODOLÓGICA 1: Calcular T_base agrupando por RADIO y KERNEL ---
+    # Buscamos el mínimo tiempo para cada par (radio, kernel) independiente.
+    # Usamos un índice múltiple para mapear correctamente.
+    dict_t_base = df_global.groupby(['radius', 'kernel'])['mean'].min().to_dict()
     
-    # Asignamos el tiempo base correspondiente a cada fila para calcular el speedup relativo
-    df_global['T_base'] = df_global['radius'].map(dict_t_base)
+    # Asignamos el tiempo base correspondiente combinando las dos columnas clave
+    df_global['T_base'] = df_global.set_index(['radius', 'kernel']).index.map(dict_t_base)
     df_global['speedup'] = df_global['T_base'] / df_global['mean']
 
     # --- PASO METODOLÓGICO 2: Definir las 3 combinaciones objetivo ---
@@ -923,7 +926,6 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
 
     # --- PASO METODOLÓGICO 3: Generar las 3 figuras independientes ---
     for comb in combinaciones:
-        # Filtrar por la combinación específica
         mask = (df_global['operation'] == comb['operation']) & (df_global['reorder'] == comb['reorder'])
         df_comb = df_global[mask].copy()
         
@@ -931,19 +933,17 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
             print(f"Aviso: Sin datos para la combinación {comb['titulo']}. Saltando figura...")
             continue
 
-        # Promediamos el Speedup juntando (colapsando) Radio, Kernel y cualquier otra dimensión variante
-        # Agrupamos estrictamente por los hiperparámetros que queremos evaluar en los ejes del heatmap
+        # Promediamos el Speedup juntando de manera justa las dimensiones de Radio y Kernel
         df_grouped = df_comb.groupby(['maxPointsLeaf', 'threshold'], as_index=False)['speedup'].mean()
 
-        # Pivotar datos: Filas (maxPointsLeaf), Columnas (threshold), Celda (Media del Speedup)
+        # Pivotar datos
         pivot = df_grouped.pivot_table(index='maxPointsLeaf', columns='threshold', 
                                        values='speedup', aggfunc='mean')
 
-        # Creamos la figura independiente (1 único plot que engloba la media de kernels y radios)
+        # Creamos la figura independiente
         fig, ax = plt.subplots(figsize=(8, 6))
         
         # Dibujar el mapa de calor corporativo
-        # Usamos coolwarm (sin _r) porque ahora un valor más alto (más speedup) es mejor (rojo)
         sns.heatmap(
             pivot, 
             annot=True, 
@@ -951,17 +951,15 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
             cmap="coolwarm", 
             ax=ax, 
             vmin=0.0, 
-            vmax=1.0, # El límite superior teórico es 1.0 (el óptimo global)
+            vmax=1.0, # Ahora el 1.0 sí representará de forma real la eficiencia óptima alcanzable
             cbar=True,
-            cbar_kws={'label': 'Speedup Relativo Medio (vs Mínimo Global)'},
+            cbar_kws={'label': 'Speedup Relativo Medio (vs Mínimo por Entorno)'},
             linewidths=0.5,
             linecolor='#EEEEEE'
         )
         
         # Títulos e identificadores académicos
-        ax.set_title(f"Mapa de Rendimiento General: {comb['titulo']}\n"
-                     , fontsize=14, pad=12)
-        
+        ax.set_title(f"Mapa de Rendimiento General: {comb['titulo']}\n", fontsize=14, pad=12)
         ax.set_xlabel('Umbral de Poda (threshold)', fontsize=11)
         ax.set_ylabel('Puntos máximos por hoja (maxPointsLeaf)', fontsize=11)
         ax.tick_params(axis='y', rotation=0)
@@ -971,13 +969,13 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
             fontsize=15, fontweight='bold', y=1.05
         )
         
-        # Ajuste de márgenes
         plt.subplots_adjust(left=0.12, right=0.95, bottom=0.12, top=0.85)
         plt.show()
         
         figs.append(fig)
         
     return figs
+
 
 def plot_octree_parallelization_heatmap(data_path, cloud, mode_filter="all", allFiles=True, annotated=True, fsz=(7, 3.5)):
     """
@@ -1087,7 +1085,7 @@ def plot_octree_parallelization_heatmap(data_path, cloud, mode_filter="all", all
         
     return figs
 
-def plot_scalability_lines(data_path, cloud, best_max_leaf, best_threshold, allFiles=True):
+def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=None, allFiles=True):
     """
     Genera una figura con dos subplots en fila (uno por cada kernel disponible).
     Muestra la evolución del tiempo total de ejecución (eje Y) según el radio (eje X)
@@ -1110,15 +1108,23 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf, best_threshold, allF
 
     df_global = pd.concat(dfs_list, ignore_index=True)
 
-    # --- FILTRADO CRÍTICO ASIMÉTRICO DE HIPERPARÁMETROS ---
     # Máscara para modos reordenados (polar, cartesian) -> usan el parámetro óptimo
-    mask_reordered = (df_global['reorder'].isin(['polar', 'cartesian'])) & (df_global['maxPointsLeaf'] == best_max_leaf)
+    if best_max_leaf is None:
+        mask_reordered = (df_global['reorder'].isin(['polar', 'cartesian']))
+    else:
+        mask_reordered = (df_global['reorder'].isin(['polar', 'cartesian'])) & (df_global['maxPointsLeaf'] == best_max_leaf)
     
     # Máscara para modos base (none) -> forzamos el óptimo absoluto de la estructura base
-    mask_base = (df_global['reorder'] == 'none') & (df_global['maxPointsLeaf'] == 128)
+    if best_max_leaf is None:
+        mask_base = (df_global['reorder'] == 'none')
+    else:
+        mask_base = (df_global['reorder'] == 'none') & (df_global['maxPointsLeaf'] == 128)
     
     # Combinamos ambas condiciones válidas y aplicamos el filtro de threshold global
-    df_filtered = df_global[(mask_reordered | mask_base) & (df_global['threshold'] == best_threshold)].copy()
+    if best_threshold is not None:
+        df_filtered = df_global[(mask_reordered | mask_base) & (df_global['threshold'] == best_threshold)].copy()
+    else:
+        df_filtered = df_global[mask_reordered | mask_base].copy()
 
     if df_filtered.empty:
         print(f"⚠️ Alerta: No hay datos que coincidan con los criterios (Reorder Leaf={best_max_leaf}, Base Leaf=128)")
@@ -1243,14 +1249,57 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf, best_threshold, allF
 
     # Título principal adaptado a la asimetría metodológica
     plt.suptitle(
-        f'Análisis de Escalabilidad y Rendimiento Temporal Asimétrico\n'
-        f'Dataset: {cloud} | Configuración Fija: Reordered maxPointsLeaf={best_max_leaf}, Base maxPointsLeaf=128, threshold={best_threshold}',
+        f'Dataset: {cloud} | Configuración: Reordered maxPointsLeaf={best_max_leaf}, Base maxPointsLeaf=128, threshold={best_threshold}',
         fontsize=13, fontweight='bold', y=1.05
     )
 
     plt.subplots_adjust(left=0.08, right=0.94, bottom=0.14, top=0.80, wspace=0.24)
-
+    plt.close(fig)
     return fig
+
+def get_scalability_dataframe(data_path, cloud, best_max_leaf, best_threshold, allFiles=True):
+    """
+    Consolida los archivos de datos y aplica el filtrado asimétrico de hiperparámetros.
+    Devuelve un DataFrame optimizado con las columnas necesarias para el análisis:
+    'radius', 'kernel', 'mean', 'operation' y 'reorder'.
+    """
+    # 1. Consolidar DataFrames de entrada
+    if allFiles:
+        dfs_list = get_dataset_files_in_dir(data_path, cloud)
+    else:
+        single_df = get_dataset_file(data_path, cloud)
+        dfs_list = [single_df] if single_df is not None else []
+
+    dfs_list = [d for d in dfs_list if d is not None and not d.empty]
+    if not dfs_list:
+        print(f"Advertencia: No se encontraron datos válidos para la nube {cloud}.")
+        return pd.DataFrame()  # Devuelve dataframe vacío seguro
+
+    df_global = pd.concat(dfs_list, ignore_index=True)
+
+    # 2. --- FILTRADO CRÍTICO ASIMÉTRICO DE HIPERPARÁMETROS ---
+    # Máscara para modos reordenados (polar, cartesian) -> usan el parámetro óptimo
+    mask_reordered = (df_global['reorder'].isin(['polar', 'cartesian'])) & (df_global['maxPointsLeaf'] == best_max_leaf)
+    
+    # Máscara para modos base (none) -> forzamos el óptimo absoluto de la estructura base (128)
+    mask_base = (df_global['reorder'] == 'none') & (df_global['maxPointsLeaf'] == 128)
+    
+    # Combinamos ambas condiciones válidas y aplicamos el filtro de threshold (umbral de poda)
+    df_filtered = df_global[(mask_reordered | mask_base) & (df_global['threshold'] == best_threshold)].copy()
+
+    if df_filtered.empty:
+        print(f"⚠️ Alerta: No hay datos que coincidan con los criterios (Reorder Leaf={best_max_leaf}, Base Leaf=128)")
+        return pd.DataFrame()
+
+    # 3. Agrupación matemática para colapsar repeticiones (media por configuración física)
+    # Agrupamos por el espectro completo de tus variables clave
+    df_grouped = df_filtered.groupby(['kernel', 'radius', 'operation', 'reorder'], as_index=False)['mean'].mean()
+
+    # 4. Selección estricta de las columnas solicitadas para limpiar el resultado
+    columnas_objetivo = ['radius', 'kernel', 'mean', 'operation', 'reorder']
+    df_final = df_grouped[columnas_objetivo].sort_values(by=['kernel', 'radius']).reset_index(drop=True)
+
+    return df_final
 
 
 ##########################################################
@@ -1390,7 +1439,7 @@ def plot_octree_pruning_polar(save: bool = False):
 
     if save:
         # Corregido: Usamos ruta relativa sin la barra inclinada inicial para evitar problemas de permisos de root
-        output_dir = './images'
+        output_dir = '../GrEI_TFG_Modelo_A_Memoria/figuras/metodologia'
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         output_path = os.path.join(output_dir, 'poda_octree_polar.png')
@@ -1507,7 +1556,7 @@ def plot_octree_pruning_cartesian_x(save: bool = False):
     plt.subplots_adjust()
 
     if save:
-        output_dir = './images'
+        output_dir = '../GrEI_TFG_Modelo_A_Memoria/figuras/metodologia'
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         output_path = os.path.join(output_dir, 'poda_octree_cartesiana_x.png')

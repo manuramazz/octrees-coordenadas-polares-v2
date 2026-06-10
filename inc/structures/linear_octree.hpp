@@ -1109,7 +1109,7 @@ public:
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(points[i])) {
                     ptsInside.push_back(i);
-                }
+            }
             }
         };
         
