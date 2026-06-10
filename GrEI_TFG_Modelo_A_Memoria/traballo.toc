@@ -24,19 +24,19 @@
 \contentsline {section}{\numberline {5.1}Plan de Verificación y Corrección Global}{29}{}%
 \contentsline {section}{\numberline {5.2}Rendimiento de búsquedas de vecinos paralelas con centros aleatorios}{29}{}%
 \contentsline {section}{\numberline {5.3}Rendimiento de búsquedas de vecinos paralelas sobre toda la nube}{33}{}%
-\contentsline {chapter}{\numberline {6}Discusión de los resultados}{35}{}%
-\contentsline {chapter}{\numberline {7}Exemplos (eliminar capítulo na versión final)}{37}{}%
-\contentsline {section}{\numberline {7.1}Un exemplo de sección}{37}{}%
-\contentsline {subsection}{\numberline {7.1.1}Un exemplo de subsección}{37}{}%
-\contentsline {subsection}{\numberline {7.1.2}Otro exemplo de subsección}{37}{}%
-\contentsline {subsubsection}{Un exemplo de subsubsección}{37}{}%
-\contentsline {subsubsection}{Un exemplo de subsubsección}{37}{}%
-\contentsline {subsubsection}{Un exemplo de subsubsección}{37}{}%
-\contentsline {section}{\numberline {7.2}Exemplos de figuras e cadros}{38}{}%
-\contentsline {section}{\numberline {7.3}Exemplos de referencias á bibliografía}{38}{}%
-\contentsline {section}{\numberline {7.4}Exemplos de enumeracións}{38}{}%
-\contentsline {chapter}{\numberline {8}Conclusións e posibles ampliacións}{41}{}%
-\contentsline {chapter}{\numberline {A}Manuais técnicos}{43}{}%
-\contentsline {chapter}{\numberline {B}Manuais de usuario}{45}{}%
-\contentsline {chapter}{\numberline {C}Licenza}{47}{}%
-\contentsline {chapter}{Bibliografía}{49}{}%
+\contentsline {chapter}{\numberline {6}Discusión de los resultados}{37}{}%
+\contentsline {chapter}{\numberline {7}Exemplos (eliminar capítulo na versión final)}{39}{}%
+\contentsline {section}{\numberline {7.1}Un exemplo de sección}{39}{}%
+\contentsline {subsection}{\numberline {7.1.1}Un exemplo de subsección}{39}{}%
+\contentsline {subsection}{\numberline {7.1.2}Otro exemplo de subsección}{39}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{39}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{39}{}%
+\contentsline {subsubsection}{Un exemplo de subsubsección}{39}{}%
+\contentsline {section}{\numberline {7.2}Exemplos de figuras e cadros}{40}{}%
+\contentsline {section}{\numberline {7.3}Exemplos de referencias á bibliografía}{40}{}%
+\contentsline {section}{\numberline {7.4}Exemplos de enumeracións}{40}{}%
+\contentsline {chapter}{\numberline {8}Conclusións e posibles ampliacións}{43}{}%
+\contentsline {chapter}{\numberline {A}Manuais técnicos}{45}{}%
+\contentsline {chapter}{\numberline {B}Manuais de usuario}{47}{}%
+\contentsline {chapter}{\numberline {C}Licenza}{49}{}%
+\contentsline {chapter}{Bibliografía}{51}{}%

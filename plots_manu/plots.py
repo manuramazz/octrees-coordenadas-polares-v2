@@ -1135,12 +1135,12 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=
         op = row['operation']
         re = row['reorder']
         if op == "neighborsStruct":
-            if re == "none":  return "Struct - None (Base, mPL=128)"
-            if re == "polar": return f"Struct - Polar (mPL={best_max_leaf})"
+            if re == "none":  return "Struct - None"
+            if re == "polar": return f"Struct - Polar"
         elif op == "neighborsPrune":
-            if re == "none":      return "Prune - None (mPL=128)"
-            if re == "polar":     return f"Prune - Polar (mPL={best_max_leaf})"
-            if re == "cartesian": return f"Prune - Cartesian (mPL={best_max_leaf})"
+            if re == "none":      return "Prune - None"
+            if re == "polar":     return f"Prune - Polar"
+            if re == "cartesian": return f"Prune - Cartesian"
         return None
 
     df_filtered['series'] = df_filtered.apply(mapear_series, axis=1)
@@ -1151,24 +1151,24 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=
 
     # Configuración estética de las series con las nuevas etiquetas dinámicas
     orden_series = [
-        "Struct - None (Base, mPL=128)", f"Struct - Polar (mPL={best_max_leaf})", 
-        "Prune - None (mPL=128)", f"Prune - Polar (mPL={best_max_leaf})", f"Prune - Cartesian (mPL={best_max_leaf})"
+        "Struct - None", f"Struct - Polar", 
+        "Prune - None", f"Prune - Polar", f"Prune - Cartesian"
     ]
     
     colores_series = {
-        "Struct - None (Base, mPL=128)":        "#4A90E2",
-        f"Struct - Polar (mPL={best_max_leaf})":     "#9013FE",
-        "Prune - None (mPL=128)":               "#50E3C2",
-        f"Prune - Polar (mPL={best_max_leaf})":      "#B8E986",
-        f"Prune - Cartesian (mPL={best_max_leaf})":  "#F5A623"
+        "Struct - None":        "#4A90E2",
+        f"Struct - Polar":     "#9013FE",
+        "Prune - None":               "#50E3C2",
+        f"Prune - Polar":      "#B8E986",
+        f"Prune - Cartesian":  "#F5A623"
     }
     
     marcadores_series = {
-        "Struct - None (Base, mPL=128)":        "o",
-        f"Struct - Polar (mPL={best_max_leaf})":     "s",
-        "Prune - None (mPL=128)":               "^",
-        f"Prune - Polar (mPL={best_max_leaf})":      "D",
-        f"Prune - Cartesian (mPL={best_max_leaf})":  "X"
+        "Struct - None":    "o",
+        f"Struct - Polar":  "o",
+        "Prune - None":     "o",
+        f"Prune - Polar":   "o",
+        f"Prune - Cartesian":"o"
     }
 
     # Mapeo matemático TeX para los Kernels
@@ -1206,7 +1206,7 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=
                 label=nombre_serie,
                 color=colores_series[nombre_serie],
                 marker=marcadores_series[nombre_serie],
-                linewidth=2,
+                linewidth=0.7,
                 markersize=7,
                 alpha=0.9
             )
@@ -1247,9 +1247,9 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=
             columnspacing=1.2
         )
 
-    # Título principal adaptado a la asimetría metodológica
+    # Título principal (nube)
     plt.suptitle(
-        f'Dataset: {cloud} | Configuración: Reordered maxPointsLeaf={best_max_leaf}, Base maxPointsLeaf=128, threshold={best_threshold}',
+        f'Dataset: {cloud}',
         fontsize=13, fontweight='bold', y=1.05
     )
 
@@ -1257,49 +1257,6 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=
     plt.close(fig)
     return fig
 
-def get_scalability_dataframe(data_path, cloud, best_max_leaf, best_threshold, allFiles=True):
-    """
-    Consolida los archivos de datos y aplica el filtrado asimétrico de hiperparámetros.
-    Devuelve un DataFrame optimizado con las columnas necesarias para el análisis:
-    'radius', 'kernel', 'mean', 'operation' y 'reorder'.
-    """
-    # 1. Consolidar DataFrames de entrada
-    if allFiles:
-        dfs_list = get_dataset_files_in_dir(data_path, cloud)
-    else:
-        single_df = get_dataset_file(data_path, cloud)
-        dfs_list = [single_df] if single_df is not None else []
-
-    dfs_list = [d for d in dfs_list if d is not None and not d.empty]
-    if not dfs_list:
-        print(f"Advertencia: No se encontraron datos válidos para la nube {cloud}.")
-        return pd.DataFrame()  # Devuelve dataframe vacío seguro
-
-    df_global = pd.concat(dfs_list, ignore_index=True)
-
-    # 2. --- FILTRADO CRÍTICO ASIMÉTRICO DE HIPERPARÁMETROS ---
-    # Máscara para modos reordenados (polar, cartesian) -> usan el parámetro óptimo
-    mask_reordered = (df_global['reorder'].isin(['polar', 'cartesian'])) & (df_global['maxPointsLeaf'] == best_max_leaf)
-    
-    # Máscara para modos base (none) -> forzamos el óptimo absoluto de la estructura base (128)
-    mask_base = (df_global['reorder'] == 'none') & (df_global['maxPointsLeaf'] == 128)
-    
-    # Combinamos ambas condiciones válidas y aplicamos el filtro de threshold (umbral de poda)
-    df_filtered = df_global[(mask_reordered | mask_base) & (df_global['threshold'] == best_threshold)].copy()
-
-    if df_filtered.empty:
-        print(f"⚠️ Alerta: No hay datos que coincidan con los criterios (Reorder Leaf={best_max_leaf}, Base Leaf=128)")
-        return pd.DataFrame()
-
-    # 3. Agrupación matemática para colapsar repeticiones (media por configuración física)
-    # Agrupamos por el espectro completo de tus variables clave
-    df_grouped = df_filtered.groupby(['kernel', 'radius', 'operation', 'reorder'], as_index=False)['mean'].mean()
-
-    # 4. Selección estricta de las columnas solicitadas para limpiar el resultado
-    columnas_objetivo = ['radius', 'kernel', 'mean', 'operation', 'reorder']
-    df_final = df_grouped[columnas_objetivo].sort_values(by=['kernel', 'radius']).reset_index(drop=True)
-
-    return df_final
 
 
 ##########################################################

@@ -87,9 +87,13 @@ ESTRATEGIA REFACTORIZACIÓN CÓDIGO
 
 QUÉ HACER AHORA
 -
+- Mandar ejecuciones parallel
+- Decidir qué graficas poner de runtime (ya está es más bien cambiarlas)
+- Revisar TODO el cap 5, justificar debidamente las decisiones de ejecución y describir los resultados
+- 
 - Mediciones de tiempos en la memoria...
 - Hablarle a Mónica.
-- Mandar ejecuciones parallel
+
 
 
 

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.6.9)  9 JUN 2026 19:34
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2026.6.9)  10 JUN 2026 11:29
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -753,24 +753,62 @@ Overfull \hbox (95.34737pt too wide) has occurred while \output is active
 \OT1/cmr/m/sl/10.95 5.3.  RENDIMIENTO DE B[]USQUEDAS DE VECINOS PARALELAS SOBRE TODA LA NUBE \OT1/cmr/m/n/10.95 33
  []
 
-[33 <./figuras/subset/lines_18train.png> <./figuras/subset/lines_18test.png>])
+[33 <./figuras/subset/lines_18train.png> <./figuras/subset/lines_18test.png>]
+<figuras/full/5085.png, id=197, 970.5861pt x 426.393pt>
+File: figuras/full/5085.png Graphic file (type png)
+<use figuras/full/5085.png>
+Package pdftex.def Info: figuras/full/5085.png  used on input line 101.
+(pdftex.def)             Requested size: 357.01244pt x 156.83905pt.
+<figuras/full/pnoa.png, id=198, 970.5861pt x 426.393pt>
+File: figuras/full/pnoa.png Graphic file (type png)
+<use figuras/full/pnoa.png>
+Package pdftex.def Info: figuras/full/pnoa.png  used on input line 103.
+(pdftex.def)             Requested size: 357.01244pt x 156.83905pt.
+<figuras/full/mar18train.png, id=199, 938.7873pt x 426.393pt>
+File: figuras/full/mar18train.png Graphic file (type png)
+<use figuras/full/mar18train.png>
+Package pdftex.def Info: figuras/full/mar18train.png  used on input line 110.
+(pdftex.def)             Requested size: 357.01244pt x 162.14813pt.
+<figuras/full/paris.png, id=200, 938.7873pt x 426.393pt>
+File: figuras/full/paris.png Graphic file (type png)
+<use figuras/full/paris.png>
+Package pdftex.def Info: figuras/full/paris.png  used on input line 112.
+(pdftex.def)             Requested size: 357.01244pt x 162.14813pt.
+<figuras/full/bild.png, id=201, 938.7873pt x 419.8887pt>
+File: figuras/full/bild.png Graphic file (type png)
+<use figuras/full/bild.png>
+Package pdftex.def Info: figuras/full/bild.png  used on input line 119.
+(pdftex.def)             Requested size: 357.01244pt x 159.67468pt.
+)
 LaTeX Info: Redefining \. on input line 68.
 LaTeX Info: Redefining \% on input line 68.
- [34]
+ [34 <./figuras/full/5085.png> <./figuras/full/pnoa.png>]
+LaTeX Info: Redefining \. on input line 68.
+LaTeX Info: Redefining \% on input line 68.
+
+Overfull \hbox (95.34737pt too wide) has occurred while \output is active
+\OT1/cmr/m/sl/10.95 5.3.  RENDIMIENTO DE B[]USQUEDAS DE VECINOS PARALELAS SOBRE TODA LA NUBE \OT1/cmr/m/n/10.95 35
+ []
+
+[35 <./figuras/full/mar18train.png> <./figuras/full/paris.png> <./figuras/full/bild.png>]
+LaTeX Info: Redefining \. on input line 69.
+LaTeX Info: Redefining \% on input line 69.
+ [36
+
+
+
+]
 \openout2 = `capitulos/cap6.aux'.
 
  (./capitulos/cap6.tex
 Cap\'{\i }tulo 6.
-) [35
-
-
-
+) [37
 
 
 ]
 LaTeX Info: Redefining \. on input line 71.
 LaTeX Info: Redefining \% on input line 71.
- [36
+ [38
 
 
 
@@ -779,7 +817,7 @@ LaTeX Info: Redefining \% on input line 71.
 
  (./capitulos/exemplos.tex
 Cap\'{\i }tulo 7.
-[37
+[39
 
 
 ]
@@ -792,7 +830,7 @@ Package epstopdf Info: Source file: <figuras/figura01.eps>
 (epstopdf)             Command: <repstopdf --outfile=figuras/figura01-eps-converted-to.pdf figuras/figura01.eps>
 (epstopdf)             \includegraphics on input line 30.
 Package epstopdf Info: Output file is already uptodate.
-<figuras/figura01-eps-converted-to.pdf, id=214, 1060.96375pt x 513.92pt>
+<figuras/figura01-eps-converted-to.pdf, id=230, 1060.96375pt x 513.92pt>
 File: figuras/figura01-eps-converted-to.pdf Graphic file (type pdf)
 <use figuras/figura01-eps-converted-to.pdf>
 Package pdftex.def Info: figuras/figura01-eps-converted-to.pdf  used on input line 30.
@@ -801,10 +839,10 @@ LaTeX Info: Redefining \. on input line 64.
 LaTeX Info: Redefining \% on input line 64.
 
 Overfull \hbox (9.7292pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/10.95 38 \OT1/cmr/m/sl/10.95 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
+\OT1/cmr/m/n/10.95 40 \OT1/cmr/m/sl/10.95 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
  []
 
-[38 <./figuras/figura01-eps-converted-to.pdf>] (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
+[40 <./figuras/figura01-eps-converted-to.pdf>] (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2023/02/27 1.9 listings language file
 ) (/usr/share/texlive/texmf-dist/tex/latex/listings/lstmisc.sty
 File: lstmisc.sty 2023/02/27 1.9 (Carsten Heinz)
@@ -831,15 +869,15 @@ Overfull \hbox (57.82074pt too wide) in paragraph at lines 97--98
 )
 LaTeX Info: Redefining \. on input line 72.
 LaTeX Info: Redefining \% on input line 72.
- [39]
+ [41]
 LaTeX Info: Redefining \. on input line 76.
 LaTeX Info: Redefining \% on input line 76.
 
 Overfull \hbox (9.7292pt too wide) has occurred while \output is active
-\OT1/cmr/m/n/10.95 40 \OT1/cmr/m/sl/10.95 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
+\OT1/cmr/m/n/10.95 42 \OT1/cmr/m/sl/10.95 CAP[]ITULO 7.  EXEMPLOS (ELIMINAR CAP[]ITULO NA VERSI[]ON FINAL)
  []
 
-[40
+[42
 
 
 
@@ -848,13 +886,13 @@ Overfull \hbox (9.7292pt too wide) has occurred while \output is active
 
  (./capitulos/conclusions.tex
 Cap\'{\i }tulo 8.
-) [41
+) [43
 
 
 ]
 LaTeX Info: Redefining \. on input line 81.
 LaTeX Info: Redefining \% on input line 81.
- [42
+ [44
 
 
 
@@ -863,13 +901,13 @@ LaTeX Info: Redefining \% on input line 81.
 
  (./capitulos/apendicea.tex
 Ap\'{e}ndice A.
-) [43
+) [45
 
 
 ]
 LaTeX Info: Redefining \. on input line 83.
 LaTeX Info: Redefining \% on input line 83.
- [44
+ [46
 
 
 
@@ -878,13 +916,13 @@ LaTeX Info: Redefining \% on input line 83.
 
  (./capitulos/apendiceb.tex
 Ap\'{e}ndice B.
-) [45
+) [47
 
 
 ]
 LaTeX Info: Redefining \. on input line 85.
 LaTeX Info: Redefining \% on input line 85.
- [46
+ [48
 
 
 
@@ -893,13 +931,13 @@ LaTeX Info: Redefining \% on input line 85.
 
  (./capitulos/licenza.tex
 Ap\'{e}ndice C.
-) [47
+) [49
 
 
 ]
 LaTeX Info: Redefining \. on input line 87.
 LaTeX Info: Redefining \% on input line 87.
- [48
+ [50
 
 
 
@@ -911,7 +949,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 10--11
 []\OT1/cmr/m/n/10.95 Acceso m^^Sulti-ple por di-vi-si^^Son de c^^Sodi-go. Ar-ti-go da wi-ki-pe-dia
  []
 
-) [49
+) [51
 
 
 ] (./traballo.aux (./capitulos/titulo.aux)
@@ -931,18 +969,18 @@ LaTeX Warning: There were undefined references.
 
  ) 
 Here is how much of TeX's memory you used:
- 9053 strings out of 476047
- 151372 string characters out of 5792076
+ 9091 strings out of 476047
+ 152471 string characters out of 5792076
  1939975 words of memory out of 5000000
- 30834 multiletter control sequences out of 15000+600000
+ 30872 multiletter control sequences out of 15000+600000
  570565 words of font info for 82 fonts, out of 8000000 for 9000
  86 hyphenation exceptions out of 8191
  67i,12n,77p,1824b,1320s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcti1095.600pk> </home/manu/.texlive2023/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1095.600pk></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsl10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on traballo.pdf (63 pages, 2450687 bytes).
+Output written on traballo.pdf (65 pages, 2805234 bytes).
 PDF statistics:
- 348 PDF objects out of 1000 (max. 8388607)
- 211 compressed objects within 3 object streams
+ 364 PDF objects out of 1000 (max. 8388607)
+ 215 compressed objects within 3 object streams
  0 named destinations out of 1000 (max. 500000)
- 71 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 96 words of extra memory for PDF output out of 10000 (max. 10000000)
 

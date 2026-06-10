@@ -86,15 +86,38 @@ Estas configuraciones óptimas personalizadas constituyen las bases de datos con
 \end{figure}
 
 \section{Rendimiento de búsquedas de vecinos paralelas sobre toda la nube}
-Estos experimentos tratan un caso de uso muy común en el manejo de nubes de puntos 3d, la búsqueda de vecinos a lo largo de todo el conjunto. Estos experimentos se pueden comportar de forma diferente a las búsquedas aleatorias debido a que, al realizar las búsquedas de forma secuencial y asignar a cada hilo un bloque de puntos consecutivos, es probable que muchos puntos compartan vecinos y por tanto habrá más aciertos caché. \textit{A priori}, este factor no debería impactar tanto en el rendimiento de las reordenaciones locales, como lo hace al variar las implementaciones del Octree o las curvas de llenado utilizadas. Aún así, puede presentar un comportamiento distinto y es interesante analizarlo. Debido a lo costosas que son estas ejecuciones, se seleccionaron un subconjunto de las nubes preparadas, manteniendo variedad entre LiDAR terrestre y aéreo provenientes de diversos datasets. También se mantuvieron fijos los hiperparámetros de \texttt{maxLeaf} y \texttt{threshold}. Se escogió para cada conjunto de nubes los siguientes pares de valores, que funcionaron bien para ese conjunto concreto en los experimentos de centros aleatorios:
+Estos experimentos tratan un caso de uso muy común en el manejo de nubes de puntos 3D, la búsqueda de vecinos a lo largo de todo el conjunto. Estos experimentos se pueden comportar de forma diferente a las búsquedas aleatorias debido a que, al realizar las búsquedas de forma secuencial y asignar a cada hilo un bloque de puntos consecutivos, es probable que muchos puntos compartan vecinos y por tanto habrá más aciertos caché. \textit{A priori}, este factor no debería impactar tanto en el rendimiento de las reordenaciones locales, como lo hace al variar las implementaciones del Octree o las curvas de llenado utilizadas. Aún así, se puede presentar un comportamiento distinto y es interesante analizarlo. Debido a lo costosas que son estas ejecuciones, se seleccionaron un subconjunto de las nubes preparadas, manteniendo variedad entre LiDAR terrestre y aéreo provenientes de diversos datasets. También se mantuvieron fijos los hiperparámetros de \texttt{maxLeaf} y \texttt{threshold}. Se escogió para cada conjunto de nubes un par de valores que fue exitoso para esa distribución de puntos en los experimentos de centros aleatorios:
 \begin{itemize}
-    \item \textbf{Nubes de alta densidad}: \texttt{[256, 64]}
-    \item \textbf{Nubes de densidad media}: \texttt{[128, 64]}
-    \item  \textbf{Nubes de baja densidad}: \texttt{[256, 64]}
+    \item \textbf{Perfil de alta densidad}: Nube \textit{bildstein\_station1}. Configuración: \texttt{[256, 64]}
+    \item \textbf{Perfil de densidad media}: Nubes  \textit{Mar18\_train} y \textit{Paris\_Luxembourg\_6}. Configuración: \texttt{[128, 64]}
+    \item  \textbf{Perfil de baja densidad}: Nubes \textit{PNOA\_2024\_PNR\_489-4672\_NPC01} y \textit{5085\_54320}. Configuración: \texttt{[256, 64]}
 \end{itemize}
 
 Adicionalmente, se fijó el algoritmo SFC a los códigos de Hilbert y se fijó una única repetición de las búsquedas.
 
-En la Tabla (tabla) se recogen todos los resultados obtenidos.
+En la Figuras \ref{fig:fullSearches_grupo1} a \ref{fig:fullSearches_grupo3} se
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/full/5085.png} 
+    \vspace{0.3cm}
+    \includegraphics[width=0.95\textwidth]{figuras/full/pnoa.png} 
+    \caption{Tiempos de ejecución de búsquedas completas variando el radio operativo sobre kernels esféricos y cúbicos para los datasets \textit{5085\_54320} (a) y \textit{PNOA\_2024\_PNR\_489-4672\_NPC01} (b).}
+    \label{fig:fullSearches_grupo1}
+\end{figure}
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/full/mar18train.png} 
+    \vspace{0.3cm}
+    \includegraphics[width=0.95\textwidth]{figuras/full/paris.png} 
+    \caption{Tiempos de ejecución de búsquedas completas variando el radio operativo sobre kernels esféricos y cúbicos para los datasets \textit{Mar18\_train} (a) y \textit{Paris\_Luxembourg\_6} (b).}
+    \label{fig:fullSearches_grupo2}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figuras/full/bild.png} 
+    \caption{Tiempos de ejecución de búsquedas completas variando el radio operativo sobre kernels esféricos y cúbicos para el dataset \textit{bildstein\_station1}.}
+    \label{fig:fullSearches_grupo3}
+\end{figure}
 
