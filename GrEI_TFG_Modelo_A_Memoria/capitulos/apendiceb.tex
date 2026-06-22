@@ -1,3 +1,362 @@
-\chapter{Manuais de usuario}
+\chapter{Manual de usuario}
 
-Incluirán toda a información precisa para aquelas persoas que repliquen o experimento: instalación, utilización, configuración, mensaxes de erro, etc. A documentación do usuario debe ser autocontida, é dicir, para o seu entendemento o usuario final non debe precisar da lectura doutro manual técnico.
+\section*{Nota previa}
+
+Este manual documenta el uso del programa \texttt{octrees-benchmark-coordenadas-polares}, que parte
+de la implementación base del Octree lineal desarrollada por Viñambres et al. \cite{Vinambres}. El presente trabajo se centra en el
+diseño e implementación de las técnicas de poda a nivel de nodo hoja
+sobre las estructuras de datos existentes (\textit{Octrees}) y sus correspondientes algoritmos de búsqueda.
+
+\section{Instalación}
+
+\subsection{Dependencias}
+
+\paragraph{LASTools}
+
+En primer lugar es necesario instalar las dependencias de LASTools, listadas
+en \url{https://github.com/LAStools/LAStools}:
+
+\begin{verbatim}
+sudo apt-get install libjpeg62 libpng-dev libtiff-dev libjpeg-dev \
+    libz-dev libproj-dev liblzma-dev libjbig-dev libzstd-dev \
+    libgeotiff-dev libwebp-dev liblzma-dev libsqlite3-dev
+\end{verbatim}
+
+A continuación, se clona el repositorio y se compila:
+
+\begin{verbatim}
+git clone --depth 1 https://github.com/LAStools/LAStools lib/LAStools
+(cd lib/LAStools && cmake -B build -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=$PWD/../LASlib . && \
+    cmake --build build -- -j && cmake --install build)
+rm -rf lib/LAStools
+\end{verbatim}
+
+\paragraph{PCL versión 1.15 (Opcional)}
+
+Se debe obtener el código fuente de la versión 1.15 desde
+\url{https://github.com/PointCloudLibrary/pcl/releases} y compilarlo. La
+carpeta de instalación usada por defecto es \texttt{\textasciitilde/local/pcl},
+aunque puede modificarse, junto con la versión buscada, editando el
+fichero \texttt{CMakeLibraries.cmake}.
+
+\begin{verbatim}
+wget https://github.com/PointCloudLibrary/pcl/releases/download/\
+pcl-1.15.0/source.tar.gz
+tar xvf source.tar.gz
+cd pcl && mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/local/pcl -DCMAKE_BUILD_TYPE=Release
+make -j2
+make -j2 install
+\end{verbatim}
+
+Si PCL no se encuentra durante la compilación, el proyecto se compilará
+igualmente con normalidad, pero sin soporte para los algoritmos de
+\textit{benchmark} basados en el Octree y el KD-Tree de PCL.
+
+\paragraph{PAPI (Opcional, para perfilado de caché)}
+
+\begin{verbatim}
+wget https://github.com/icl-utk-edu/papi/releases/download/\
+papi-7-2-0-t/papi-7.2.0.tar.gz -P lib
+tar xvf lib/papi-7.2.0.tar.gz -C lib && rm lib/papi-7.2.0.tar.gz \
+    && mv lib/papi-7.2.0 lib/papi/
+(cd lib/papi/src && ./configure --prefix=$(pwd)/.. && make -j \
+    && make install)
+\end{verbatim}
+
+\subsection{Compilación}
+
+Una vez instaladas las dependencias necesarias, dentro del directorio del
+proyecto basta con ejecutar:
+
+\begin{verbatim}
+cmake -B build -DCMAKE_BUILD_TYPE=Release .
+cmake --build build
+\end{verbatim}
+
+Esto genera el ejecutable en \texttt{build/octrees-benchmark}.
+
+Para más comodidad, existe el script de bash \texttt{compile.sh}, que ejecuta esos comandos además de limpiar el directorio de build (recomendado borrar el direcorio siempre que se compile después de introducir cambios en el código).
+
+\subsection{Verificación de la instalación: Tests}
+
+El proyecto incluye una batería de tests unitarios mediante GoogleTest, que
+permite comprobar que la instalación y compilación se realizaron
+correctamente. Para habilitarla, se debe compilar el proyecto con la opción
+\texttt{-DBUILD\_TESTS=ON}:
+
+\begin{verbatim}
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON .
+cmake --build build
+\end{verbatim}
+
+Tras compilar el proyecto, todos los tests se pueden ejecutar mediante:
+
+\begin{verbatim}
+make                # compila la biblioteca y todos los ejecutables de test
+ctest --output-on-failure
+\end{verbatim}
+
+También es posible ejecutar cada batería de tests de forma individual, por
+ejemplo:
+
+\begin{verbatim}
+./tests/test_points
+./tests/test_encoders
+./tests/test_octree
+./tests/test_octree_advanced
+\end{verbatim}
+
+Para ejecutar un caso de test concreto con CTest, se utiliza la opción
+\texttt{-R} seguida del nombre del test, por ejemplo:
+
+\begin{verbatim}
+ctest -R LinearOctreeTest.RadiusSearch
+\end{verbatim}
+
+Adicionalmente, bajo \texttt{tests/example.cpp} se incluye un pequeño ejemplo
+de uso de las funcionalidades de la biblioteca, que se compila
+automáticamente junto con el proyecto principal:
+
+\begin{verbatim}
+make test_library
+./tests/test_library
+\end{verbatim}
+
+\section{Ejecución}
+
+El programa se ejecuta a través del binario generado en la compilación,
+\texttt{build/octrees-benchmark}, configurando su comportamiento mediante
+parámetros de línea de comandos. A continuación se muestra un ejemplo de
+invocación, correspondiente a uno de los experimentos descritos en esta
+memoria: una búsqueda completa secuencial de vecinos
+sobre la nube \texttt{Paris\_Luxembourg\_6}, comparando los distintos reordenamientos existentes sobre los dos algorimtmos de búsqueda sobre los que se trabajó para una selección de radios.
+
+\begin{verbatim}
+./build/octrees-benchmark --kernels "sphere" -i "data/paris_lille/Lille_0.las" \
+    -o "out_tfg_reorders_v3/full" -e "hilb" --kernels "cube,sphere" -r "2.0,5.0,8.0" -s "all" --sequential --repeats 1 -a "neighborsPrune,neighborsStruct" --local-reorder "none,polar,cartesian" --max-leaf "256" --umbral-poda "64"
+\end{verbatim}
+
+Para reproducir el conjunto completo de experimentos descritos en los
+capítulos de Pruebas y Discusión de Resultados de esta memoria, el
+proyecto incluye una serie de scripts:
+
+\begin{itemize}
+    \item \texttt{bench\_neighbors\_reorders.bash}: búsquedas de vecinos de centros aleatorios.
+    \item \texttt{bench\_neighbors\_full\_reorders.bash}: búsquedas de vecinos de coberturas completas.
+    \item \texttt{bench\_neighbors\_parallel.bash}: búsquedas de vecinos para diferentes escalas de paralelización, tanto de centros aleatorios como coberturas completas.
+    \item \texttt{bench\_neighbors\_debug\_range\_selector.bash}: búsquedas reducidas (60 búsquedas), sobre el mismo conjunto de nubes, con la opción de depuración de podas habilitadas, devolviendo archivos con el número de puntos podados por hoja. (Modificar con precaución: generan archivos muy pesados, escribiendo una línea por hoja evaluada en cada búsqueda).
+    \item Adicionalmente, se encuentran los scripts del estudio de partida: \item \texttt{bench\_locality.bash}, \item \texttt{bench\_memory.bash}, \item \texttt{bench\_neighbors.bash}, \item \texttt{bench\_neighbors\_temp.bash}
+\end{itemize}
+
+Asimismo, bajo la carpeta \texttt{plots\_reorders} se incluyen todos los scripts y notebooks en Python empleados para generar las figuras presentadas en esta memoria. Se puede consultar cada gráfica para cada una de las nubes de puntos estudiadas, ya que no todas fueron incluidas en la memoria. En la carpeta \texttt{plots} se encuentran las figuras de los resultados publicados por Viñambres et al., también disponibles para consulta.
+
+
+
+\subsection{Formato de entrada}
+
+El programa toma como entrada nubes de puntos en formato binario
+\texttt{.LAS}, gestionadas internamente mediante la biblioteca LASTools.
+
+\subsection{Formato de salida}
+
+Los resultados de cada ejecución se almacenan en la ruta indicada mediante el parámetro \texttt{-o}/\texttt{--output}. El programa genera ficheros con las métricas temporales y de efectividad de poda correspondientes a la
+configuración de parámetros especificada, que sirven de entrada a los scripts de generación de gráficas.
+
+\subsection{Ejecución de la verificación de funcionamiento de las podas}
+En la ruta \texttt{test\_funcionalidad\_podas/test\_vecindades.ipynb} está el test de Python que comprueba si los resultados usando reordenamientos son idénticos a los resultados sin hacer uso de la optimización (función \texttt{verificar\_integridad\_vecinos}). Los parámetros a introducir son los siguientes:
+\begin{itemize}
+    \item \textbf{data\_path}: Ruta de los archivos \texttt{.csv} devueltos por las ejecuciones del programa.
+    \item \textbf{clouds}: El test comprobará todos los casos posibles solamente para las nubes aquí especificadas.
+\end{itemize}
+
+\section{Parámetros del programa} 
+
+A continuación se detallan todos los parámetros aceptados por el programa. Para consultar esta misma información desde la propia terminal, se puede invocar la ayuda integrada mediante:
+
+\begin{verbatim}
+./build/octrees-benchmark --help
+\end{verbatim}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{p{1.6cm} p{3.3cm} p{8.8cm}}
+\caption{Parámetros principales del programa \texttt{octrees-benchmark}.} \\
+\toprule
+\textbf{Opción} & \textbf{Alias} & \textbf{Descripción} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Opción} & \textbf{Alias} & \textbf{Descripción} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+
+\texttt{-h} & \texttt{--help} & Muestra el mensaje de ayuda. \\
+
+\texttt{-i} & \texttt{--input} & Ruta del fichero de entrada. \\
+
+\texttt{-c} & \texttt{--container-type} &
+Tipo de contenedor a utilizar. Por defecto: \texttt{AoS}. Valores posibles:
+\texttt{SoA}, \texttt{AoS}. \\
+
+\texttt{-o} & \texttt{--output} & Ruta del fichero de salida. \\
+
+\texttt{-r} & \texttt{--radii} &
+Radios de búsqueda a evaluar (separados por comas, p. ej.\
+\texttt{2.5,5.0,7.5}). \\
+
+\texttt{-v} & \texttt{--kvalues} &
+Valores de $k$ para las búsquedas KNN (separados por comas, p. ej.\
+\texttt{10,50,250,1000}). \\
+
+\texttt{-s} & \texttt{--searches} &
+Número de búsquedas a realizar (con centros aleatorios, salvo que se
+indique \texttt{--sequential}). Si se indica \texttt{all}, se realiza una
+búsqueda sobre la totalidad de la nube (con indexación secuencial). \\
+
+\texttt{-t} & \texttt{--repeats} &
+Número de repeticiones a realizar para cada configuración del
+\textit{benchmark}. \\
+
+\texttt{-k} & \texttt{--kernels} &
+Especifica los kernels de búsqueda a utilizar (separados por comas o
+\texttt{all}). Valores posibles: \texttt{sphere}, \texttt{cube},
+\texttt{square}, \texttt{circle}. \\
+
+\texttt{-a} & \texttt{--search-algo} &
+Especifica los algoritmos de búsqueda a ejecutar (separados por comas o
+\texttt{all}). Por defecto:
+\texttt{neighborsPtr,neighbors,neighborsPrune,neighborsStruct}.
+Valores posibles: \newline
+\textbf{Búsqueda por radio:} \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighborsPtr} -- búsqueda básica sobre
+el Octree de punteros \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighbors} -- búsqueda básica sobre el
+Octree lineal \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighborsPrune} -- búsqueda optimizada
+sobre el Octree lineal con poda de octantes \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighborsStruct} -- búsqueda optimizada
+mediante rangos de índices \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighborsApprox} -- búsqueda aproximada
+(cotas superior/inferior), requiere \texttt{--approx-tol} \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighborsUnibn} -- búsqueda mediante
+unibnOctree \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighborsPCLKD} -- búsqueda mediante el
+KD-Tree de PCL (si está disponible) \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighborsPCLOct} -- búsqueda mediante el
+Octree de PCL (si está disponible) \newline
+\hspace*{0.4cm}\textbullet\ \texttt{neighborsPico} -- búsqueda mediante
+PicoTree \newline
+\textbf{Búsqueda KNN:} \newline
+\hspace*{0.4cm}\textbullet\ \texttt{KNNV2} -- búsquedas KNN sobre el Octree
+lineal \newline
+\hspace*{0.4cm}\textbullet\ \texttt{KNNNanoflann} -- búsquedas KNN mediante
+nanoflann \newline
+\hspace*{0.4cm}\textbullet\ \texttt{KNNPCLKD} -- búsqueda KNN mediante el
+KD-Tree de PCL (si está disponible) \newline
+\hspace*{0.4cm}\textbullet\ \texttt{KNNPCLOCT} -- búsqueda KNN mediante el
+Octree de PCL (si está disponible) \newline
+\hspace*{0.4cm}\textbullet\ \texttt{KNNPico} -- búsqueda KNN mediante
+PicoTree \\
+
+\texttt{-e} & \texttt{--encodings} &
+Selecciona las codificaciones SFC con las que reordenar la nube antes de
+las búsquedas (separadas por comas o \texttt{all}). Por defecto:
+\texttt{all}. Valores posibles: \newline
+\hspace*{0.4cm}\textbullet\ \texttt{none} -- sin codificación; el Octree
+lineal no se construirá con esta opción \newline
+\hspace*{0.4cm}\textbullet\ \texttt{mort} -- reordenamiento mediante SFC de
+Morton \newline
+\hspace*{0.4cm}\textbullet\ \texttt{hilb} -- reordenamiento mediante SFC de
+Hilbert \\
+
+\texttt{--} & \texttt{--local-reorders} &
+Selecciona los reordenamientos locales a nivel de hoja a aplicar sobre la nube antes de las búsquedas (separados por comas o \texttt{all}). Por defecto:
+\texttt{all}. Valores posibles: \newline
+\hspace*{0.4cm}\textbullet\ \texttt{none} -- sin reordenamiento local \newline
+\hspace*{0.4cm}\textbullet\ \texttt{polar} -- reordenamiento local polar
+(según el ángulo azimutal $\varphi$) \newline
+\hspace*{0.4cm}\textbullet\ \texttt{cartesian} -- reordenamiento local
+cartesiano (según las coordenadas $x$, $y$, $z$) \\
+
+\texttt{-u} & \texttt{--umbral-poda} &
+Umbral mínimo de puntos
+(\texttt{threshold}) necesario para emplear el selector de rango y podar la
+hoja. Por defecto: 16. Toda hoja con un número de puntos inferior a este
+umbral se recorrerá de forma secuencial, sin aplicar la poda. \\
+
+\texttt{--} & \texttt{--debug-ranges} &
+Activa el registro
+(\textit{logging}) detallado de la selección de rangos en cada hoja
+conflictiva visitada durante las búsquedas. \\
+
+\texttt{--} & \texttt{--debug} &
+Activa el modo de depuración general (mide los tiempos de construcción del
+Octree y de codificación). \\
+
+\texttt{--} & \texttt{--build-enc} &
+Ejecuta \textit{benchmarks} para la codificación y construcción de las
+estructuras seleccionadas (aquellas con representante en \texttt{-a}\,/\,
+\texttt{--search-algo}). \\
+
+\texttt{--} & \texttt{--memory} &
+Ejecuta un \textit{benchmark} simple para medir la memoria consumida por
+una estructura, mediante perfilado del \textit{heap}. Valores posibles:
+\texttt{ptrOct}, \texttt{linOct}, \texttt{unibnOct}, \texttt{nanoKD},
+\texttt{pclOct}, \texttt{pclKD}, \texttt{picoTree}. \\
+
+\texttt{--} & \texttt{--locality} &
+Ejecuta \textit{benchmarks} para analizar la localidad de la nube de puntos
+tras aplicar los reordenamientos indicados. \\
+
+\texttt{--} & \texttt{--cache-profiling} &
+Activa el perfilado de la memoria caché durante la ejecución de los
+algoritmos de búsqueda, mediante PAPI. \\
+
+\texttt{--} & \texttt{--check} &
+Activa la comprobación de resultados (opción heredada; se recomienda usar
+\texttt{avg\_result\_size} para verificar la corrección de los
+resultados). \\
+
+\texttt{--} & \texttt{--no-warmup} &
+Desactiva la fase de calentamiento (\textit{warmup}) previa a las
+mediciones. \\
+
+\texttt{--} & \texttt{--approx-tol} &
+Valores de tolerancia para la búsqueda aproximada (separados por comas,
+p. ej.\ \texttt{10.0,50.0,100.0}). \\
+
+\texttt{--} & \texttt{--num-threads} &
+Lista de números de hilos a evaluar en el test de escalabilidad (separados
+por comas, p. ej.\ \texttt{1,2,4,8,16,32}). Si no se especifica, OpenMP
+emplea por defecto el número máximo de hilos disponibles y no se ejecuta
+ningún test de escalabilidad. \\
+
+\texttt{--} & \texttt{--sequential} &
+Hace que el conjunto de búsquedas sea secuencial en lugar de aleatorio
+(habitualmente más rápido). Se activa automáticamente al usar
+\texttt{-s all}. \\
+
+\texttt{--} & \texttt{--max-leaf} &
+Número máximo de puntos por hoja del Octree (por defecto = 128). No aplica
+al Octree de PCL. \\
+
+\texttt{--} & \texttt{--pcl-oct- resolution} &
+Tamaño mínimo de octante para la subdivisión en el Octree de PCL. \\
+
+\end{longtable}
+
+\section{Mensajes de error y problemas comunes}
+
+A continuación se recogen algunas situaciones de error habituales y cómo
+resolverlas:
+
+\begin{itemize}
+    \item \textbf{El programa no encuentra el fichero de entrada}: comprobar
+    que la ruta indicada en \texttt{-i}/\texttt{--input} es correcta y que el
+    fichero existe, tiene formato \texttt{.LAS} y tiene permisos de lectura.
+
+    \item \textbf{Uso de 
+\end{itemize}

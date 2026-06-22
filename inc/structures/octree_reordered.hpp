@@ -18,7 +18,9 @@
 
 /** 
  * @class OctreeReordered
+ *
  * @brief This class calculates and stores the reordered point data for each leaf of the octree based on the specified reordering mode (Cartesian or Polar). It also computes the keys for binary search in the search process.
+ *
  * @details The class provides two main functionalities:
  * 1. Calculating the keys of the points in each leaf separately based on the selected reordering mode. For Cartesian mode, it calculates the keys based on the X, Y, and Z coordinates. For Polar mode, it calculates the keys based on the azimuthal angle in the XY plane.
  *    The keys are stored in a structure of vectors that allows for efficient access during the search process.
@@ -67,7 +69,7 @@ public:
             sortedFlat.PointsZ.resize(totalPoints);
         }
 
-        // Rellenar en paralelo: Cada hoja procesa su propio rango global indexado
+        // Parallel building of the sorted data flat structure
         #pragma omp parallel for schedule(dynamic)
         for (size_t leaf = 0; leaf < numLeaves; ++leaf)
         {
@@ -75,7 +77,6 @@ public:
             size_t begin = 0;
             std::vector<size_t> leafPointsLocal;
 
-            // Recuperamos la información de direccionamiento de la hoja del Octree
             if constexpr (useLeafPoints) {
                 leafPointsLocal = octree.getLeafPoints(leaf);
                 count = leafPointsLocal.size();
@@ -87,15 +88,14 @@ public:
 
             if (count == 0) continue;
 
-            // CASO A: La hoja supera el umbral y tiene permutaciones de reordenamiento
+            // CASE A:  number of leaf points > umbralPoda) -> Reorder points
             if (count > mainOptions.umbralPoda) 
             {
                 if (mode == ReorderMode::Cartesian) {
+                    // Cartesian mode: for each axis, we reorder the points according to the permutations calculated previously
                     for (size_t i = 0; i < count; ++i) {
-                        // Sintaxis corregida: usamos la constante booleana calculada previamente
                         size_t globalIdx = useLeafPoints ? leafPointsLocal[i] : (begin + i);
 
-                        // Para cada eje, buscamos qué punto va en esta posición 'i' secuencial de la hoja
                         size_t idxX = useLeafPoints ? leafPointsLocal[leafPerms[leaf].perms[0][i]] : (begin + leafPerms[leaf].perms[0][i]);
                         size_t idxY = useLeafPoints ? leafPointsLocal[leafPerms[leaf].perms[1][i]] : (begin + leafPerms[leaf].perms[1][i]);
                         size_t idxZ = useLeafPoints ? leafPointsLocal[leafPerms[leaf].perms[2][i]] : (begin + leafPerms[leaf].perms[2][i]);
@@ -104,17 +104,17 @@ public:
                         const auto& pY = points[idxY];
                         const auto& pZ = points[idxZ];
 
-                        // Guardamos en la posición global correspondiente de cada layout
+                        // We need to store the original global index in the id field to be able to retrieve the original point data during the search process
                         sortedFlat.PointsX[globalIdx] = Point(idxX, pX.getX(), pX.getY(), pX.getZ());
                         sortedFlat.PointsY[globalIdx] = Point(idxY, pY.getX(), pY.getY(), pY.getZ());
                         sortedFlat.PointsZ[globalIdx] = Point(idxZ, pZ.getX(), pZ.getY(), pZ.getZ());
                     }
                 } 
-                else { // Modo Polar
+                else {
+                    // Polar mode: for each leaf, we reorder according to the azimuthal angle values calculated previously.
                     for (size_t i = 0; i < count; ++i) {
                         size_t globalIdx = useLeafPoints ? leafPointsLocal[i] : (begin + i);
 
-                        // Buscamos el punto según la permutación del ángulo azimutal
                         size_t idxPolar = useLeafPoints ? leafPointsLocal[leafPerms[leaf].perms[0][i]] : (begin + leafPerms[leaf].perms[0][i]);
 
                         const auto& p = points[idxPolar];
@@ -122,7 +122,7 @@ public:
                     }
                 }
             }
-            // CASO B: La hoja es pequeña (<= umbralPoda). Copia directa 1:1 para preservar consistencia
+            // CASE B: number of leaf points <= umbralPoda) -> Direct copy
             else 
             {
                 for (size_t i = 0; i < count; ++i) {
@@ -151,7 +151,6 @@ public:
     // ============================================================
     // Building of permutation and keys vectors
     // ============================================================
-
     void buildLeafPermutations(
         Octree_t& octree,
         Container& points,
@@ -258,6 +257,7 @@ public:
                 leafKeys[leaf].keys[k] = sortedK;
             }
         }
+        // Once perms and keys are built, we can build the sorted vectors
         buildSortedDataFlat(octree, points, mode, leafPerms);
     }
 

@@ -1,13 +1,15 @@
 // octree_types.hpp
 #pragma once
 
+// Key used for ordering points in cartesian mode
 enum class OrderType {
-    K0 = 0, // 
-    K1 = 1, // 
-    K2 = 2  //
+    K0 = 0, // X axis
+    K1 = 1, // Y axis
+    K2 = 2  // Z axis
 };
 
-
+// Object containing duplicated points reordered locally
+// In polar mode only PointsPolar is resized, in cartesian mode the 3 corresponding vectors are resized
 struct SortedDataFlat {
     std::vector<Point> PointsPolar;
     std::vector<Point> PointsX;
@@ -15,7 +17,8 @@ struct SortedDataFlat {
     std::vector<Point> PointsZ;
 };
 
-
+// Strcture returned by the range selector function
+// Includes min and max indexes, key used (only cartesian), second range indexes if the range crosses the origin (only polar)
 struct PrunedRange {
     size_t iMin  = 0;
     size_t iMax  = 0;
@@ -24,6 +27,7 @@ struct PrunedRange {
     bool hasSecond = false;
     OrderType order = OrderType::K0;
 
+    // Point counter: Only used for debug purposes
     [[nodiscard]] inline size_t count() const { return hasSecond ? (iMax - iMin) + (iMax2 - iMin2) : (iMax - iMin); }
 };
 
@@ -52,19 +56,17 @@ namespace detail {
         return radius;
     }
 
-
-    struct LeafQueryGeometry {
-        double dx, dy, dz;
-        double dxy;
-        double radius=0, rEff=0, rxyEff=0;
-    };
-
-
+    // Translates angle domain from [-pi, pi] to [0, 2pi]
     inline double normalizeAngle0To2Pi(double a) {
         double out = std::fmod(a, kTwoPi);
         return out < 0.0 ? out + kTwoPi : out;
     }
 
-
+    // Not used
+    struct LeafQueryGeometry {
+        double dx, dy, dz;
+        double dxy;
+        double radius=0, rEff=0, rxyEff=0;
+    };
 
 } // namespace detail

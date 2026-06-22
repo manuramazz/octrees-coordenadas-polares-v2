@@ -435,6 +435,7 @@ class NeighborsBenchmark {
             typename LinearOctree<Container>::RangeFn getRange = nullptr;
             const std::string_view reorderModeStr = localReorderTypeToString(mode);
 
+            // Callback function to get the range of pruned points by leaf depending on the reordering mode
             if (mode == ReorderMode::Polar) {
                 getRange = [&](uint32_t leafIndex, const Point& query, double radius, size_t count, const Vector& leafRadii) {
                     PrunedRange range = bestRangePolar(leafIndex, query, radius, kernel,
@@ -448,7 +449,7 @@ class NeighborsBenchmark {
                     return range;
                 };
             }
-
+            // Basic NEIGHBORS algorithm (no points pruning supported)
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS)) {
                 auto neighborsSearch = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
@@ -465,6 +466,7 @@ class NeighborsBenchmark {
                 };
                 executeBenchmark(neighborsSearch, kernelName, SearchAlgo::NEIGHBORS, reorderModeStr);
             }
+            // NEIGHBORS_PRUNE algorithm (both polar and cartesian reordering supported, debug mode for pruning metrics also supported)
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS_PRUNE)) {
                 auto neighborsSearchPrune = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
@@ -512,11 +514,11 @@ class NeighborsBenchmark {
                 };
                 executeBenchmark(neighborsSearchPrune, kernelName, SearchAlgo::NEIGHBORS_PRUNE, reorderModeStr);
             }
+            // NEIGHBORS_STRUCT algorithm (only polar reordering supported, debug mode not integrated)
             if(mainOptions.searchAlgos.contains(SearchAlgo::NEIGHBORS_STRUCT)) {
                 auto neighborsSearchStruct = [&](double radius) -> size_t {
                     size_t averageResultSize = 0;
                     std::vector<size_t> &searchIndexes = searchSet.searchPoints[searchSet.currentRepeat];
-                    // Enviar a la función adecuada en función de la reordenación
                     if(mode == ReorderMode::Polar){
                         #pragma omp parallel for schedule(runtime) reduction(+:averageResultSize)
                             for(size_t i = 0; i<searchSet.numSearches; i++) {
@@ -733,19 +735,18 @@ class NeighborsBenchmark {
 #endif
 
             void initializeBenchmarkLinearOctree() {
-                // Construcción del octree
+                // Octree construction
                 LinearOctree<Container> oct(points, codes, box, enc);
                 std::cout << "[LOG] LinearOctree initialized. Num of leaves=" << oct.getNumLeaves() << "\n";
 
-                // Bucle sobre los modos de reordenación
+                // Loop over reordering modes specified in the main options
                 for (ReorderMode mode : mainOptions.localReorders) {
-
-                    //Declaración del objeto OctreeReordered a pasar por referencia
+                    
                     OctreeReordered<std::decay_t<decltype(oct)>, Container> reordered;
 
                     if (mode != ReorderMode::None) {
+                        // The OctreeReordered object is initialized here: it contains the reordered copies of the points vector
                         std::cout << "[LOG] Reordering mode " << (mode == ReorderMode::Polar ? "Polar" : "Cartesian") << std::endl;
-                        // Measure time taken by reordering to include it in the logs
                         auto startTime = std::chrono::high_resolution_clock::now();
                         reordered.buildLeafPermutations(oct, points, mode);
                         oct.setReorderedVectors(reordered.getSortedFlat());
@@ -757,7 +758,7 @@ class NeighborsBenchmark {
                         std::cout << "[LOG] No reordering applied.\n";
                     }
                     
-                    // Bucle sobre kernels
+                    // Loop over kernels
                     for (const auto& kernel : mainOptions.kernels) {
                         switch (kernel) {
                             case Kernel_t::sphere:

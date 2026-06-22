@@ -23,7 +23,7 @@ datasets_high_density=(
 )
 
 N_SEARCHES="10000"
-ALGO="neighborsPrune,neighborsStruct"
+ALGO="neighborsPrune"
 THREADS="1,2,4,8,16,24,32,40"
 LOCAL_REORDERS="none,polar,cartesian"
 MAX_POINTS_LEAF=256

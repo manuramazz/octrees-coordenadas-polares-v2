@@ -24,7 +24,7 @@
 #include "main_options.hpp"
 #include "neighbor_set.hpp"
 #include "structures/octree_types.hpp"
-
+#include "octree_range_selector.hpp"
 
 /**
 * @class LinearOctree
@@ -42,38 +42,7 @@
 */
 
 
-// Declared out of the class: function to create the file path (for the time mesurement in debug-leaves-time mode)
-// This mode mesuares separately the time of the range selection and the time of the loop over the points in the leaf, to be able to see how much time we are spending in each part and if the optimizations on range selection are effective.
-// the other debug mode (debug-ranges) prints the ranges selected for each leaf, as well as the total points of the leaf and the number of points that were selected as neighbors.
-namespace {
-    bool hasLoggedThisSearch = false;
-    double accumulatedGetRangeTime = 0.0;
-    double accumulatedLoopTime = 0.0;
-}
 
-inline std::filesystem::path getFindAndInsertPointsLogPath() {
-    static std::optional<std::filesystem::path> rangeTimingLogPath;
-    if (!rangeTimingLogPath.has_value()) {
-        const std::filesystem::path logDir = mainOptions.outputDirName / "leaves-time";
-        std::filesystem::create_directories(logDir);
-        const std::string baseName = mainOptions.inputFileName.empty() ? std::string("octree") : mainOptions.inputFileName;
-        const auto now = std::chrono::system_clock::now();
-        const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-        std::tm tmSnapshot{};
-#ifdef _WIN32
-        localtime_s(&tmSnapshot, &nowTime);
-#else
-        localtime_r(&nowTime, &tmSnapshot);
-#endif
-
-        std::ostringstream stamp;
-        stamp << std::put_time(&tmSnapshot, "%Y%m%d_%H%M%S");
-        rangeTimingLogPath = logDir / (baseName + "-" + stamp.str() + ".csv");
-    }
-    return *rangeTimingLogPath;
-}
-
-#include "octree_range_selector.hpp"
 
 
 template <PointContainer Container>
@@ -809,7 +778,7 @@ public:
         } while (node != 0); // The root node is obtained, search finished
     }
 
-    /**
+    /** NEIGHBORS STRUCT
      * @brief Search neighbors function. Similar to neighborsPrune(), but returns a list-of-ranges wrapper structure containing the neighbours. 
      * This structure implements a forward iterator and can thus be used in a loop. It is way faster as it does not need to copy
      * pointers to each individual point found. 
@@ -866,7 +835,7 @@ public:
         return result;
 	}
 
-    // STRUCT -> POLAR OPT
+    // NEIGHBORS STRUCT -> Polar coords optimization
     template<typename Kernel>
     [[nodiscard]] NeighborSet<Container> neighborsStructPolar(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::None) const {
         NeighborSet<Container> result(&points);
@@ -949,9 +918,8 @@ public:
 
 
     /*
-    * @brief Auxiliar func to log selected ranges during searches with getRange
+    * @brief Auxiliar func to log selected ranges during searches with ranges debug enabled.
     */
-
 
     inline std::ofstream& getRangeSelectorLog() const{
         static std::ofstream logFile = []() {
@@ -1009,45 +977,6 @@ public:
         printRangeSelectorLog(ss.str());
     }
 
-    void resetFindAndInsertPointsAccumulators() const {
-        hasLoggedThisSearch = false;
-        accumulatedGetRangeTime = 0.0;
-        accumulatedLoopTime = 0.0;
-    }
-
-    void writeFindAndInsertPointsLog(const std::string& kernelName, double radius, ReorderMode mode) const {
-        if (!mainOptions.debugLeavesTime || hasLoggedThisSearch) {
-            return;
-        }
-        
-        const std::filesystem::path logPath = getFindAndInsertPointsLogPath();
-        std::ofstream logFile(logPath, std::ios::app);
-        if (!logFile.is_open()) {
-            return;
-        }
-
-        if (!rangeTimingLogHeaderWritten) {
-            rangeTimingLogHeaderWritten = true;
-            std::error_code ec;
-            if (!std::filesystem::exists(logPath, ec) || std::filesystem::file_size(logPath, ec) == 0) {
-                logFile << "kernel,radius,mode,get_range_time,loop_time,projectionTime,binarySearchTime,threshold,maxPointsLeaf\n";
-            }
-        }
-
-        logFile << kernelName << ","
-                << std::to_string(radius) << ","
-                << localReorderTypeToString(mode) << ","
-                << accumulatedGetRangeTime << ","
-                << accumulatedLoopTime << ","
-                << "0.0" << ","
-                << "0.0" << ","
-                << std::to_string(mainOptions.umbralPoda) << ","
-                << std::to_string(mainOptions.maxPointsLeaf) << "\n";
-
-        hasLoggedThisSearch = true;
-    }
-
-
 
     template<typename Kernel>
     static std::string getKernelName(const Kernel&) {
@@ -1076,7 +1005,7 @@ public:
      * @param k specific kernel that contains the data of the region (center and radius)
      * @return Points inside the given kernel type.
      */
-    // Original
+    // Original function
     template<typename Kernel>
     [[nodiscard]] std::vector<size_t> neighborsPrune(const Kernel& k) const {
         std::vector<size_t> ptsInside;
@@ -1117,7 +1046,7 @@ public:
         return ptsInside;
 	}
 
-    // Polar coords opt
+    // NEIGHBORS PRUNE: Polar coords opt
     template<typename Kernel>
     [[nodiscard]] std::vector<size_t> neighborsPrunePolar(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Polar) const {
         std::vector<size_t> ptsInside;
@@ -1189,7 +1118,7 @@ public:
 	}
 
 
-    // Cartesian coords opt
+    // NEIGHBORS PRUNE: Cartesian coords opt
     template<typename Kernel>
     [[nodiscard]] std::vector<size_t> neighborsPruneCartesian(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Cartesian) const {
         std::vector<size_t> ptsInside;
@@ -1270,7 +1199,7 @@ public:
         return ptsInside;
 	}
 
-    // RANGES DEBUG -> Polar coords opt
+    // NEIGHBORS PRUNE: debug mode with Polar coords opt
     template<typename Kernel>
     [[nodiscard]] std::vector<size_t> neighborsPrunePolarRangesDebug(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Polar) const {
         std::vector<size_t> ptsInside;
@@ -1353,7 +1282,7 @@ public:
         return ptsInside;
 	}
 
-    // RANGES DEBUG- > Cartesian coords opt
+    // NEIGHBORS PRUNE: ranges debug with Cartesian coords opt
     template<typename Kernel>
     [[nodiscard]] std::vector<size_t> neighborsPruneCartesianRangesDebug(const Kernel& k, const RangeFn& getRange = nullptr, ReorderMode mode = ReorderMode::Cartesian) const {
         std::vector<size_t> ptsInside;
@@ -1458,15 +1387,8 @@ public:
             return k.boxOverlap(this->centers[nodeIndex], this->precomputedRadii[nodeDepth]);
         };
         
-        resetFindAndInsertPointsAccumulators();
         auto findAndInsertPoints = [&](uint32_t nodeIndex, uint32_t dummy) {
             // Reached a leaf, add all points inside the kernel
-
-            //POLAR COORD OPTIMIZACION
-            // getRange returnes the permutation of the leaf points sorted by the most optimal key for each leaf
-            // Also returns the range of points in the permutation that are inside the search radius, so we can skip points that are outside of it without checking them
-            
-            //We only check sorted local indexes [iMin, iMax) converted to global indexes with the perm vector + internalRanges[nodeIndex].first
 
             assert(nodeIndex < nTotal && "nodeIndex out of bounds in neighbors::findAndInsertPoints");
             assert(nodeIndex < internalRanges.size() && "nodeIndex out of bounds for internalRanges");
@@ -1474,71 +1396,16 @@ public:
             size_t endIndex = this->internalRanges[nodeIndex].second;
             assert(startIndex <= endIndex && "invalid range in internalRanges");
             assert(endIndex <= points.size() && "internalRanges points end out of bounds");
-            TimeWatcher getRangeWatcher;
-            TimeWatcher loopWatcher;
 
-            if (getRange) {
-                // assert(nodeIndex < this->internalToLeaf.size() && "nodeIndex out of bounds for internalToLeaf");
-                // const int32_t leafIndex = this->internalToLeaf[nodeIndex];
-                // if (leafIndex >= 0) {
-                //     assert(static_cast<size_t>(leafIndex) < nLeaf && "leafIndex out of bounds in neighbors");
-                //     if (mainOptions.debugLeavesTime) {
-                //         getRangeWatcher.start();
-                //     }
-                //     const auto [perm, sortedLeafPoints, range] = getRange(static_cast<uint32_t>(leafIndex), k.center(), searchRadius);
-                //     if (mainOptions.debugLeavesTime) {
-                //         getRangeWatcher.stop();
-                //         accumulatedGetRangeTime += getRangeWatcher.getElapsedDecimalSeconds();
-                //     }
-                //     if (perm != nullptr) {
-                //         if (mainOptions.debugLeavesTime) {
-                //             loopWatcher.start();
-                //         }
-                //         for (size_t i = range.iMin; i < range.iMax; ++i) {
-                //             const size_t pointIndex = startIndex + (*perm)[i];
-                //             if (k.isInside(points[pointIndex])) {
-                //                 ptsInside.push_back(pointIndex);
-                //             }
-                //         }
-                //         if (mainOptions.debugLeavesTime) {
-                //             loopWatcher.stop();
-                //             accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                //         }
-                //         if (range.hasSecond) {
-                //             if (mainOptions.debugLeavesTime) {
-                //                 loopWatcher.start();
-                //             }
-                //             for (size_t i = range.iMin2; i < range.iMax2; ++i) {
-                //                 const size_t pointIndex = startIndex + (*perm)[i];
-                //                 if (k.isInside(points[pointIndex]))
-                //                     ptsInside.push_back(pointIndex);
-                //             }
-                //             if (mainOptions.debugLeavesTime) {
-                //                 loopWatcher.stop();
-                //                 accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-                //             }
-                //         }
-                //         return;
-                //     }
-                // }
-            }
 
-            // Normal case, check all points in the leaf
-            if (mainOptions.debugLeavesTime) {
-                loopWatcher.start();
-            }
             for (size_t i = startIndex; i < endIndex; ++i) {
                 if (k.isInside(points[i]) && condition(points[i])) {
                     ptsInside.push_back(i);
                 }
             }
-            if (mainOptions.debugLeavesTime) {
-                loopWatcher.stop();
-                accumulatedLoopTime += loopWatcher.getElapsedDecimalSeconds();
-            }
+
         };
         singleTraversal(intersectsKernel, findAndInsertPoints);
-        writeFindAndInsertPointsLog(getKernelName(k), searchRadius, mode);
         return ptsInside;
 	}
 

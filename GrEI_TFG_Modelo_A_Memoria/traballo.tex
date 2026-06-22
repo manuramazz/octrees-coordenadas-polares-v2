@@ -27,9 +27,12 @@
 \usepackage{multirow}
 \usepackage{amsmath}
 \usepackage{booktabs}
+\usepackage{longtable}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{subcaption}
+\usepackage{url}
+\usepackage{hyperref}
 
 % \usepackage{hyperref} % menús no pdf pero non leva ben co package galician
 
@@ -39,8 +42,6 @@
 
 \begin{document}
 \include{capitulos/titulo}
-\cleardoublepage
-\include{capitulos/certificacion} % paxina de certificación (optativa)
 \cleardoublepage
 \include{capitulos/agradecementos} % paxina de agradecementos (optativa) 
 \cleardoublepage
@@ -69,11 +70,6 @@
 \cleardoublepage
 \include{capitulos/cap6}
 \cleardoublepage
-\include{capitulos/exemplos}
-%
-% Engadir os capitulos que fagan falta
-%
-\cleardoublepage
 \include{capitulos/conclusions}
 
 % Aquí empezan os apéndices
@@ -82,8 +78,8 @@
 \include{capitulos/apendicea}
 \cleardoublepage
 \include{capitulos/apendiceb}
-\cleardoublepage
-\include{capitulos/licenza}
+% \cleardoublepage
+% \include{capitulos/licenza}
 \cleardoublepage
 \include{capitulos/bibliografia}
 
