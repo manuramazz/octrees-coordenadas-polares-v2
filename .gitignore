@@ -6,7 +6,6 @@ data
 heaptrack
 lib
 old
-out*
 results*
 prueba*
 logs
@@ -14,3 +13,4 @@ plots/__pycache__
 cmake-build-debug
 cmake-build-release
 results/
+apuntes.md
