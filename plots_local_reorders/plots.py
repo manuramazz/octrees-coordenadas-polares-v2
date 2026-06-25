@@ -36,7 +36,7 @@ def plot_pruning_points(csv_path: str, save: bool = False, output_dir: Path = No
     df['config'] = df.apply(config_label, axis=1)
     configs = df['config'].unique()
 
-    # --- CÁLCULO DE L MEDIA SEGURO (SOLO MODO NONE) ---
+    # CÁLCULO DE L MEDIA (SOLO MODO NONE)
     if 'L' in df.columns and 'mode' in df.columns:
         df_base_leaves = df[df['mode'] == 'none']
         if df_base_leaves.empty:
@@ -51,7 +51,6 @@ def plot_pruning_points(csv_path: str, save: bool = False, output_dir: Path = No
     else:
         leaf_mapping = None
 
-    # --- AGREGACIÓN DIRECTA Y LIMPIA ---
     agg = (
         df.groupby(['mode', 'kernel', 'radius', 'config'])
         .agg(
@@ -90,10 +89,10 @@ def plot_pruning_points(csv_path: str, save: bool = False, output_dir: Path = No
 
             x = np.arange(n_kernels)
             
-            # Modificado: Colores fijos globales independientes del radio
-            color_total = '#4472C4'  # Azul sólido
-            color_eval  = '#ED7D31'  # Naranja sólido
-            color_neigh = '#70AD47'  # Verde sólido
+            # Colores por barra
+            color_total = '#4472C4'  # Azul 
+            color_eval  = '#ED7D31'  # Naranja 
+            color_neigh = '#70AD47'  # Verde 
 
             fig, ax = plt.subplots(figsize=(max(12, n_kernels * 3), 7))
 
@@ -124,7 +123,7 @@ def plot_pruning_points(csv_path: str, save: bool = False, output_dir: Path = No
                 bars_ne = ax.bar(x + offset_neigh, neighbors, bar_width, label='Vecinos' if (ri == 0) else "",
                                  color=color_neigh, edgecolor='black', linewidth=0.3)
 
-                # --- TEXTO R/L INDEPENDIENTE Y SEGURO ---
+                # Texto R/L como leyenda del eje X
                 for ki, k in enumerate(kernels):
                     if k in df_r.index:
                         L_val = df_r.loc[k, 'L_clean']
@@ -180,7 +179,12 @@ def plot_pruning_points(csv_path: str, save: bool = False, output_dir: Path = No
             
             plt.close(fig)
 
+
+
 def plot_pruning_distribution(csv_path: str, save: bool = False, output_dir: Path = None) -> None:
+    """
+    En desuso: mostraba la distribución del % de puntos podados a lo largo de las hojas
+    """
     df = pd.read_csv(csv_path)
     dataset_name = Path(csv_path).stem
 
@@ -300,6 +304,10 @@ def plot_pruning_distribution(csv_path: str, save: bool = False, output_dir: Pat
         plt.close(fig)
 
 def plot_density_analysis(csv_path, save: bool = False) -> None:
+    """
+    En desuso: mostraba el % de puntos podados de media
+    Para cada bloque de hojas separadas por tamaño (también el la distribución de los tamaños de hojas mediante un histograma)
+    """
     df = pd.read_csv(csv_path)
     dataset_name = Path(csv_path).stem
 
@@ -345,7 +353,7 @@ def plot_density_analysis(csv_path, save: bool = False) -> None:
         ax1 = axes[i]
         df_k = df[df['kernel'] == kernel]
         
-        # --- FONDO: Distribución general de hojas (Histograma) ---
+        # Distribución general de hojas (Histograma)
         # Sumamos todas las hojas de todos los radios para ver la estructura del dataset
         summary_bg = df_k.groupby('density_range', observed=True)['leaf'].count().reset_index()
         sns.barplot(data=summary_bg, x='density_range', y='leaf', 
@@ -355,7 +363,7 @@ def plot_density_analysis(csv_path, save: bool = False) -> None:
         ax1.set_ylabel('Nº de Hojas (Total)', fontsize=14, color='gray')
         ax1.tick_params(axis='x', rotation=45)
         
-        # --- SEGUNDO EJE: Series de Poda por Radio ---
+        # SEGUNDO EJE: Series de Poda por Radio
         ax2 = ax1.twinx()
         
         for i, (r, mode) in enumerate(combinations):
@@ -364,7 +372,6 @@ def plot_density_analysis(csv_path, save: bool = False) -> None:
             # Calculamos la poda media por cada rango de densidad para este radio concreto
             summary_r = df_r.groupby('density_range', observed=True)['pruning_pct'].mean().reset_index()
             
-            # Dibujamos la serie
             sns.lineplot(data=summary_r, x='density_range', y='pruning_pct', 
                          ax=ax2, marker='o', markersize=8, linewidth=2.5,
                          label=f'r = {r}, mode = {mode}', color=palette[i])
@@ -386,6 +393,9 @@ def plot_density_analysis(csv_path, save: bool = False) -> None:
 
 
 def plot_key_distribution(csv_path: str, save: bool = False, output_dir: Path = None) -> None:
+    """
+    Muestra el porcentaje de veces que se usa cada clave para cada modo de reorder
+    """
     df = pd.read_csv(csv_path)
     dataset_name = Path(csv_path).stem
     # Detectar si hay columnas de configuración
@@ -487,228 +497,7 @@ def plot_key_distribution(csv_path: str, save: bool = False, output_dir: Path = 
 
 
 ##########################################################
-################ GRAFICAS DE DEBUG LEAVES ################
-##########################################################
-def analyze_speedup_and_timing_separated(csv_path: str, save: bool = False, filename: str = ""):
-    df = pd.read_csv(csv_path)
-    if not filename:
-        filename = Path(csv_path).stem
-        filename = filename.split('-')[0] 
-    
-    # Detectar si hay columnas de configuración
-    has_threshold = 'threshold' in df.columns
-    has_max_leaf  = 'maxPointsLeaf' in df.columns
-
-    # Construir etiqueta de configuración por fila
-    def config_label(row):
-        parts = []
-        if has_threshold:
-            parts.append(f'thr={int(row["threshold"])}')
-        if has_max_leaf:
-            parts.append(f'maxL={int(row["maxPointsLeaf"])}')
-        return ' | '.join(parts) if parts else 'default'
-
-    df['config'] = df.apply(config_label, axis=1)
-    
-    # =========================================================================
-    # TRUCO DE INGENIERÍA: FUSIÓN DE FILAS DE PARCHE CON FILAS REALES
-    # =========================================================================
-    # Una nueva consulta siempre empieza cuando get_range_time > 0 o loop_time > 0.
-    # Las líneas de parche tienen ambos campos a 0.0, por lo que se agruparán con su consulta real.
-    is_new_query = (df['get_range_time'] > 0) | (df['loop_time'] > 0)
-    df['query_id'] = is_new_query.cumsum()
-    
-    time_cols = ['get_range_time', 'loop_time', 'projectionTime', 'binarySearchTime']
-    meta_cols = [c for c in df.columns if c not in time_cols and c != 'query_id']
-    
-    # Fusionamos las líneas sumando sus componentes de tiempo
-    df_collapsed = df.groupby('query_id').agg({
-        **{col: 'first' for col in meta_cols},
-        **{col: 'sum' for col in time_cols}
-    }).reset_index(drop=True)
-    
-    configs = df_collapsed['config'].unique()
-    
-    # Ahora calculamos las medias reales sobre el dataframe colapsado y limpio
-    avg_times = df_collapsed.groupby(['kernel', 'radius', 'mode'])[['get_range_time', 'loop_time', 'projectionTime', 'binarySearchTime']].mean().reset_index()
-    
-    # Calcular Speedup por búsqueda individual utilizando datos colapsados
-    reference = df_collapsed[df_collapsed['mode'] == 'none'].groupby(['kernel', 'radius'])['loop_time'].mean().reset_index()
-    reference.rename(columns={'loop_time': 'loop_time_none'}, inplace=True)
-    
-    df_speedup = pd.merge(df_collapsed, reference, on=['kernel', 'radius'])
-    
-    df_speedup['total_time'] = df_speedup['get_range_time'] + df_speedup['loop_time']
-    df_speedup['speedup'] = df_speedup['loop_time_none'] / df_speedup['total_time']
-    
-    df_speedup_filtered = df_speedup[df_speedup['mode'] != 'none']
-
-    # --- GRÁFICA 1: TIEMPO DESGLOSADO (Barras Apiladas Quirúrgicas) ---
-    kernels = avg_times['kernel'].unique()
-    for kern in kernels:
-        df_kern = avg_times[avg_times['kernel'] == kern]
-        
-        modes = df_kern['mode'].unique()
-        radii = sorted(df_kern['radius'].unique())
-        
-        fig, ax = plt.subplots(figsize=(12, 7))
-        
-        width = 0.25  # Ancho de las barras
-        multiplier = 0
-        
-        for mode in modes:
-            df_m = df_kern[df_kern['mode'] == mode]
-            # Asegurar orden de radios
-            df_m = df_m.set_index('radius').reindex(radii).reset_index()
-            
-            offset = width * multiplier
-            
-            # FILTRADO CONDICIONAL DE APILAMIENTO SOLICITADO
-            if mode in ['polar', 'cartesian']:
-                # Nivel 1 (Base): Tiempo de proyección matemática
-                p1 = ax.bar(np.arange(len(radii)) + offset, df_m['projectionTime'], width, 
-                            label=f'{mode} (Proyección)', alpha=0.5)
-                
-                # Nivel 2 (Medio): Tiempo de búsqueda binaria (apilado sobre proyección)
-                p2 = ax.bar(np.arange(len(radii)) + offset, df_m['binarySearchTime'], width, 
-                            bottom=df_m['projectionTime'], label=f'{mode} (Búsq. Binaria)', alpha=0.7)
-                
-                # Nivel 3 (Techo): Tiempo de escaneo e inserción (apilado sobre el total del selector)
-                selector_total = df_m['projectionTime'] + df_m['binarySearchTime']
-                p3 = ax.bar(np.arange(len(radii)) + offset, df_m['loop_time'], width, 
-                            bottom=selector_total, label=f'{mode} (Loop)', alpha=0.9)
-            else:
-                # Modo 'none' u otros fallbacks (Mantiene el comportamiento tradicional)
-                p1 = ax.bar(np.arange(len(radii)) + offset, df_m['get_range_time'], width, 
-                            label=f'{mode} (Selector)', alpha=0.6)
-                
-                p2 = ax.bar(np.arange(len(radii)) + offset, df_m['loop_time'], width, 
-                            bottom=df_m['get_range_time'], label=f'{mode} (Loop)', alpha=0.9)
-            
-            multiplier += 1
-            
-        ax.set_ylabel('Tiempo Medio (Segundos)')
-        ax.set_title(f'Desglose Quirúrgico de Tiempo: Selector Interno vs Loop\nKernel: {kern.upper()} | Dataset: {filename} | Config: {", ".join(configs)}')
-        ax.set_xticks(np.arange(len(radii)) + width, [f'r={r}' for r in radii])
-        ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-        ax.grid(axis='y', alpha=0.3)
-        
-        plt.tight_layout()
-        if save:
-            out_path = Path(csv_path).parent / f'{filename}_{kern}_time_breakdown.png'
-            plt.savefig(out_path, dpi=150, bbox_inches='tight')
-            plt.close()
-            print(f'Guardado: {out_path}')
-        else:
-            plt.show()
-        plt.close(fig)
-
-def analyze_speedup_and_timing(csv_path: str, save: bool = False, filename: str = ""):
-    df = pd.read_csv(csv_path)
-    if not filename:
-        filename = Path(csv_path).stem
-        filename = filename.split('-')[0] 
-    
-    # Detectar si hay columnas de configuración
-    has_threshold = 'threshold' in df.columns
-    has_max_leaf  = 'maxPointsLeaf' in df.columns
-
-    # Construir etiqueta de configuración por fila
-    def config_label(row):
-        parts = []
-        if has_threshold:
-            parts.append(f'thr={int(row["threshold"])}')
-        if has_max_leaf:
-            parts.append(f'maxL={int(row["maxPointsLeaf"])}')
-        return ' | '.join(parts) if parts else 'default'
-
-    df['config'] = df.apply(config_label, axis=1)
-    configs = df['config'].unique()
-    
-    avg_times = df.groupby(['kernel', 'radius', 'mode'])[['get_range_time', 'loop_time']].mean().reset_index()
-    
-    # Calcular Speedup por búsqueda individual
-    reference = df[df['mode'] == 'none'].groupby(['kernel', 'radius'])['loop_time'].mean().reset_index()
-    reference.rename(columns={'loop_time': 'loop_time_none'}, inplace=True)
-    
-    df_speedup = pd.merge(df, reference, on=['kernel', 'radius'])
-    
-    df_speedup['total_time'] = df_speedup['get_range_time'] + df_speedup['loop_time']
-    
-    df_speedup['speedup'] = df_speedup['loop_time_none'] / df_speedup['total_time']
-    
-    df_speedup_filtered = df_speedup[df_speedup['mode'] != 'none']
-
-    # --- GRÁFICA 1: TIEMPO DESGLOSADO (Barras Apiladas) ---
-    kernels = avg_times['kernel'].unique()
-    for kern in kernels:
-        df_kern = avg_times[avg_times['kernel'] == kern]
-        
-        modes = df_kern['mode'].unique()
-        radii = sorted(df_kern['radius'].unique())
-        
-        fig, ax = plt.subplots(figsize=(12, 7))
-        
-        width = 0.25  # ancho de las barras
-        multiplier = 0
-        
-        for mode in modes:
-            df_m = df_kern[df_kern['mode'] == mode]
-            # Asegurar orden de radios
-            df_m = df_m.set_index('radius').reindex(radii).reset_index()
-            
-            offset = width * multiplier
-            
-            # Parte inferior: get_range_time
-            p1 = ax.bar(np.arange(len(radii)) + offset, df_m['get_range_time'], width, 
-                        label=f'{mode} (Selector)', alpha=0.6)
-            
-            # Parte superior: loop_time
-            p2 = ax.bar(np.arange(len(radii)) + offset, df_m['loop_time'], width, 
-                        bottom=df_m['get_range_time'], label=f'{mode} (Loop)', alpha=0.9)
-            
-            multiplier += 1
-        ax.set_ylabel('Tiempo Medio (Segundos)')
-        ax.set_title(f'Desglose de Tiempo: Selector vs Loop\nKernel: {kern.upper()} | Dataset: {filename} | Config: {", ".join(configs)}')
-        ax.set_xticks(np.arange(len(radii)) + width, [f'r={r}' for r in radii])
-        ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-        ax.grid(axis='y', alpha=0.3)
-        
-        plt.tight_layout()
-        plt.show()
-        if save:
-            out_path = Path(csv_path).parent / f'{filename}_{kern}_time_breakdown.png'
-            plt.savefig(out_path, dpi=150, bbox_inches='tight')
-            plt.close()
-            print(f'Guardado: {out_path}')
-
-    # --- GRÁFICA 2: DISTRIBUCIÓN DEL SPEEDUP (Boxplot) ---
-    for kern in kernels:
-        df_kern_s = df_speedup_filtered[df_speedup_filtered['kernel'] == kern]
-        
-        plt.figure(figsize=(12, 7))
-        sns.boxplot(data=df_kern_s, x='radius', y='speedup', hue='mode', palette='Set2')
-        
-        plt.axhline(y=1, color='red', linestyle='--', label='Break-even (Speedup=1)')
-        
-        plt.yscale('log')
-        plt.title(f'Distribución de Speedup Individual por Radio\nKernel: {kern.upper()} | Dataset: {filename} | Config: {", ".join(configs)}')
-        plt.ylabel('Speedup (Log Scale)')
-        plt.xlabel('Radio de búsqueda')
-        plt.legend()
-        plt.grid(axis='y', alpha=0.3)
-        
-        plt.show()
-        if save:
-            out_path = Path(csv_path).parent / f'{filename}_{kern}_speedup_distribution.png'
-            plt.savefig(out_path, dpi=150, bbox_inches='tight')
-            plt.close()
-            print(f'Guardado: {out_path}')
-        plt.close(fig)
-
-
-##########################################################
-#################### GRAFICAS FINALES ####################
+################### GRAFICAS TIEMPOS FINALES #############
 ##########################################################
 import pandas as pd
 import numpy as np
@@ -717,10 +506,9 @@ import seaborn as sns
 import matplotlib.ticker as ticker
 def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius="all"):
     """
-    Consolida todos los archivos en un único DataFrame y genera una figura independiente
-    para cada valor de radio, mostrando 'maxPointsLeaf' en el eje X con gráficos de barras.
-    Muestra 5 barras por grupo basándose en la combinación de algoritmo y ordenación.
-    Devuelve una lista de objetos Figure de Matplotlib.
+    Tiempos de ejecución para las 5 combinaciones de interés (Struct/Prune con None/Polar/Cartesian)
+    Una figura por nube y radio. 
+    Se muestran las 5 barras para cada valor de maxLeaf, agrupando por el resto de params.
     """
     # 1. Consolidar DataFrames
     if allFiles:
@@ -748,7 +536,7 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
     if df_global.empty:
         return []
 
-    # --- MODIFICACIÓN: Crear el mapeo para las 5 combinaciones requeridas ---
+    # Crear el mapeo para las 5 combinaciones requeridas
     def mapear_experimento(row):
         op = row['operation']
         re = row['reorder']
@@ -773,13 +561,13 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
         "Prune - None", "Prune - Polar", "Prune - Cartesian"
     ]
     
-    # Paleta de colores personalizada (Tonos azules/morados para Struct, verdes/cálidos para Prune)
+    # Paleta de colores personalizada
     colores_5_barras = {
         "Struct - None": "#4A90E2",       # Azul
         "Struct - Polar": "#9013FE",      # Morado
-        "Prune - None": "#50E3C2",       # Turquesa/Verde menta
-        "Prune - Polar": "#B8E986",      # Verde claro
-        "Prune - Cartesian": "#F5A623"   # Naranja
+        "Prune - None": "#50E3C2",        # Turquesa/Verde menta
+        "Prune - Polar": "#B8E986",       # Verde claro
+        "Prune - Cartesian": "#F5A623"    # Naranja
     }
 
     # Mapeo TeX para la notación matemática formal de los Kernels
@@ -843,24 +631,22 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
             # Estilización de ejes
             ax.set_ylabel('Mean runtime (s)' if i == 0 else '', fontsize=16)
             ax.set_xlabel('Puntos máximos por hoja (maxPointsLeaf)', fontsize=16)
-            ax.grid(True, which="both", ls=":", alpha=0.15, axis='y')
-            ax.set_yscale('log')
-            
-            # Formateador del eje Y logarítmico limpio
-            ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, subs=(1.0, 2.0, 5.0), numticks=20))
+            ax.grid(True, which="major", ls=":", alpha=0.15, axis='y') # Modificado: Solo grid principal
+                        
+            # Configuración de ticks y formateador para escala lineal limpia
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=8, prune='lower'))
             ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{y:.4f}'.rstrip('0').rstrip('.')))
-            ax.yaxis.set_minor_formatter(ticker.NullFormatter())
             
+            # Se eliminan las configuraciones de ticks menores que daban problemas en lineal
             ax.tick_params(axis='both', which='major', labelsize=14, width=1.2, length=6)
-            ax.tick_params(axis='y', which='minor', width=0.8, length=3) # Mantiene las líneas sin texto
 
-        # --- LEYENDA ÚNICA GLOBAL SUPERIOR ---
+        # Leyenda global superior
         if handles:
             fig.legend(
                 handles, labels,
                 loc="upper center",
-                bbox_to_anchor=(0.5, 0.98),  # Centrado arriba
-                ncol=len(labels),            # Forzar una única fila con los 5 elementos
+                bbox_to_anchor=(0.5, 0.98), 
+                ncol=len(labels),           
                 frameon=True,
                 facecolor='white',
                 edgecolor='#CCCCCC',
@@ -880,10 +666,10 @@ def plot_reorder_vs_base(data_path, cloud, allFiles=False, kernel="all", radius=
 
 def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="all", radius="all"):
     """
-    Consolida los archivos, calcula el mínimo tiempo global por radio y kernel (para normalizar en igualdad de condiciones),
-    obtiene el Speedup relativo y promedia los resultados colapsando las dimensiones de Radio y Kernel.
-    Genera 3 figuras independientes por dataset para las combinaciones objetivo.
-    Devuelve una lista de objetos Figure de Matplotlib.
+    Heatmap sobre una matriz variando el tamaño de puntos por hoja y el umbral de acctivación de poda.
+    Muestra la media del Speedup relativo para cada valor de radio en relación al mejor tiempo del radio de entre todas las combinaciones posibles.
+    Así, se puede ver qué combinación de parámetros es la más eficiente promediando radio y kernel.
+    Genera 3 figuras independientes por dataset para las combinaciones de algoritmo con método de poda.
     """
     # 1. Consolidar DataFrames
     if allFiles:
@@ -911,16 +697,15 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
     if df_global.empty:
         return []
 
-    # --- 🛠️ CORRECCIÓN METODOLÓGICA 1: Calcular T_base agrupando por RADIO y KERNEL ---
+    #  Calcular T_base agrupando por RADIO y KERNEL ---
     # Buscamos el mínimo tiempo para cada par (radio, kernel) independiente.
-    # Usamos un índice múltiple para mapear correctamente.
     dict_t_base = df_global.groupby(['radius', 'kernel'])['mean'].min().to_dict()
     
     # Asignamos el tiempo base correspondiente combinando las dos columnas clave
     df_global['T_base'] = df_global.set_index(['radius', 'kernel']).index.map(dict_t_base)
     df_global['speedup'] = df_global['T_base'] / df_global['mean']
 
-    # --- PASO METODOLÓGICO 2: Definir las 3 combinaciones objetivo ---
+    #  Definir las 3 combinaciones objetivo
     combinaciones = [
         {"operation": "neighborsPrune",  "reorder": "polar",     "titulo": "Prune - Polar"},
         {"operation": "neighborsPrune",  "reorder": "cartesian", "titulo": "Prune - Cartesian"},
@@ -929,7 +714,7 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
 
     figs = []
 
-    # --- PASO METODOLÓGICO 3: Generar las 3 figuras independientes ---
+    # Generar las 3 figuras independientes
     for comb in combinaciones:
         mask = (df_global['operation'] == comb['operation']) & (df_global['reorder'] == comb['reorder'])
         df_comb = df_global[mask].copy()
@@ -963,7 +748,7 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
             linecolor='#EEEEEE'
         )
         
-        # Títulos e identificadores académicos
+        # Títulos e identificadores
         ax.set_title(f"Algoritmo usado: {comb['titulo']}\n", fontsize=15, pad=12)
         ax.set_xlabel('Umbral de Poda (threshold)', fontsize=15)
         ax.set_ylabel('Puntos máximos por hoja (maxPointsLeaf)', fontsize=15)
@@ -979,11 +764,8 @@ def plot_threshold_heatmap_comparison(data_path, cloud, allFiles=True, kernel="a
 
 def plot_octree_parallelization_heatmap(data_path, cloud, mode_filter="all", allFiles=True, annotated=True, fsz=(7, 3.5)):
     """
-    Genera mapas térmicos de eficiencia de paralelización OpenMP para uno o varios modos.
-    Promedia los impactos de hiperparámetros (maxPointsLeaf, umbralPoda, kernel) para aislar la relación Radio vs Threads.
-    
-    Retorna:
-        list: Una lista con los objetos 'fig' de matplotlib generados para cada modo.
+    Genera heatmaps de eficiencia de paralelización OpenMP para uno o varios modos.
+    El eje X representa el número de hilos, el eje Y el tamaño de radio. Se agrupan el resto de params posibles.
     """
     # 1. Consolidar DataFrames
     if allFiles:
@@ -1044,11 +826,11 @@ def plot_octree_parallelization_heatmap(data_path, cloud, mode_filter="all", all
         # CÁLCULO DE EFICIENCIA: E = T1 / (T_N * N)
         df_efficiency["efficiency"] = df_efficiency["T1"] / (df_efficiency["openmp_threads"] * df_efficiency["mean"])
         
-        # CREACIÓN DE MATRIZ: Eje Y -> radius, Eje X -> openmp_threads
+        #  Eje Y -> radius, Eje X -> openmp_threads
         efficiency_matrix = df_efficiency.pivot(index="radius", columns="openmp_threads", values="efficiency")
         efficiency_matrix = efficiency_matrix.sort_index(ascending=True)
         
-        # RENDERIZADO DE LA FIGURA ACTUAL
+        # Rederizado de la figura
         fig, ax = plt.subplots(figsize=fsz)
         
         heatmap = sns.heatmap(efficiency_matrix, 
@@ -1086,12 +868,9 @@ def plot_octree_parallelization_heatmap(data_path, cloud, mode_filter="all", all
 
 def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=None, allFiles=True):
     """
-    Genera una figura con dos subplots en fila (uno por cada kernel disponible).
-    Muestra la evolución del tiempo total de ejecución (eje Y) según el radio (eje X)
-    para las 5 configuraciones de algoritmo/ordenación.
-    
-    FILTRADO ESPECIAL: Los modos Reordered usan 'best_max_leaf', mientras que 
-    los modos Base (none) usan de forma fija 'maxPointsLeaf = 128'.
+    Genera una figura por nube con dos subplots (uno por cada kernel disponible).
+    Gráficos de líneas de tiempos de ejecución para distintos valores de radio
+    Cinco series: Struct/Prune con None/Polar/Cartesian
     """
     # 1. Consolidar DataFrames
     if allFiles:
@@ -1129,7 +908,7 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=
         print(f"⚠️ Alerta: No hay datos que coincidan con los criterios (Reorder Leaf={best_max_leaf}, Base Leaf=128)")
         return None
 
-    # --- MAPEO DE LAS 5 SERIES TEMPORALES ---
+    # MAPEO DE LAS 5 SERIES TEMPORALES
     def mapear_series(row):
         op = row['operation']
         re = row['reorder']
@@ -1145,10 +924,10 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=
     df_filtered['series'] = df_filtered.apply(mapear_series, axis=1)
     df_filtered = df_filtered.dropna(subset=['series'])
 
-    # --- AGRUPACIÓN (MEDIA DE ENCODERS) ---
+    # AGRUPACIÓN (MEDIA DE ENCODERS)
     df_plot = df_filtered.groupby(['kernel', 'radius', 'series'], as_index=False)['mean'].mean()
 
-    # Configuración estética de las series con las nuevas etiquetas dinámicas
+    # Configuración de las series con las nuevas etiquetas dinámicas
     orden_series = [
         "Struct - None", f"Struct - Polar", 
         "Prune - None", f"Prune - Polar", f"Prune - Cartesian"
@@ -1232,7 +1011,7 @@ def plot_scalability_lines(data_path, cloud, best_max_leaf=None, best_threshold=
         ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:g}'))
         ax.tick_params(axis='both', which='major', labelsize=14)
 
-    # --- LEYENDA GLOBAL SUPERIOR ---
+    # Leyenda global superior
     if handles:
         fig.legend(
             handles, labels,
